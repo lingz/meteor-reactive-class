@@ -87,20 +87,6 @@ Post.prototype.getName = function() {
 PostCollection._transform = Post.transform;
 ```
 
-### Custom Constructor
-
-```javascript
-PostCollection = new Meteor.Collection();
-var postConstructor = function(name) {
-  console.log("Constructing post with name: " + name);
-  this.name = name;
-};
-Post = new ReactiveClass(postConstructor, PostCollection);
-Post.prototype.getName = function() {
-  return this.name;
-}
-```
-
 ### Inheritance
 Extend an existing class
 
@@ -132,7 +118,7 @@ class Post extends ReactiveClass(PostCollection)
   constructor: (name) ->
     console.log "Constructing post with name: " + name
     this.name = name
-    super() #IMPORTANT! Not optional
+    ReactiveClass.initiliaze.call(this) # Important! Not optional!
 
   getName: () ->
     return this.name

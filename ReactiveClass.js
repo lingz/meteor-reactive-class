@@ -9,8 +9,14 @@ ReactiveClass = function(collection, opts) {
   var default_offline_fields = ["_dep", "_reactive"];
   var offline_fields = Array.prototype.slice.call(default_offline_fields);
 
+
   ReactiveClass = function(fields) {
     _.extend(this, fields);
+    ReactiveClass.initialize.call(this);
+  };
+
+  // decoupling the initializer from the ReactiveClass constructor
+  ReactiveClass.initialize = function () {
     this._dep = new Deps.Dependency();
     this._reactive = options.reactive;
   };
@@ -50,12 +56,12 @@ ReactiveClass = function(collection, opts) {
 
   ReactiveClass.fetchOne = function(query, opts) {
     var record;
-    if (!opts || opts.reactive === false)
+    if (opts && opts.reactive)
+      record = collection.findOne(query);
+    else
       record = Deps.nonreactive(function() {
         return collection.findOne(query);
       });
-    else
-      record = collection.findOne(query);
     if (_.isEmpty(record))
       return undefined;
     return this.transform(record);
@@ -74,12 +80,12 @@ ReactiveClass = function(collection, opts) {
     // when this reactively reruns, it will delete all objects of the array
     // and create them fresh
     var queryResults;
-    if (opts && opts.reactive === false) {
+    if (opts && opts.reactive) {
+      queryResults = collection.find.apply(args).fetch();
+    } else {
       Deps.nonreactive(function() {
         queryResults = collection.find.apply(args).fetch();
       });
-    } else {
-      queryResults = collection.find.apply(args).fetch();
     }
     for (var i = 0, length = queryResults.length; i++; i < queryResultsLength) {
       // for each of the objects in the list, creative a reactively updating
@@ -219,7 +225,7 @@ ReactiveClass = function(collection, opts) {
     return this;
   };
 
-  // Allows extension
+  // extending
   var __hasProp = {}.hasOwnProperty,
   __extends = function(child, parent) { 
     for (var key in parent) { 
@@ -234,11 +240,10 @@ ReactiveClass = function(collection, opts) {
     return child; 
   };
 
-  ReactiveClass.extend = function() {
+  ReactiveClass.extend = function(childClass) {
     var args = Array.prototype.splice(arguments);
     var constructor, collection;
-    if (args.length === 0)
-      if (!)
+    if (!childClass)
       throw new Meteor.Error(500,
         "You must specify the collection you are extending"
       );
@@ -249,9 +254,11 @@ ReactiveClass = function(collection, opts) {
         );
       collection = args[1];
       constructor = function() {
-        ReactiveClass(collection).call(this)
-        args[0].call(this)
-      }
+        childClass.call(this);
+        ReactiveClass.initialize.call(this);
+      };
+      __extends(constructor, childClass);
+      __extends(constructor, ReactiveClass);
     }
     return constructor;
   };
