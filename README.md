@@ -8,8 +8,9 @@ automatically update their fields whenever minimongo reactively reports that
 their corresponding entry has changed. Objects are *not reinstantiated* when
 the corresponding collection record updates and therefore can maintain state.
 
-It also acts as an ORM over mongoDB and allows for simply changing fields in a
-natural way and calling `.update()` to reflect those changes on the DB.
+It also acts as a database wrapper over MongoDB and allows for simply
+changing fields in a natural way and calling `.update()` to reflect those
+changes on the DB.
 
 ## Example
 
@@ -40,6 +41,8 @@ PostCollection.update({name: "My Cool Post"},
 ); 
 // Output: Name changed, it is now: My Very Cool Post
 // (Computation was invalidated)
+console.log(post.name); // My Very Cool Post
+
 
 // Reactive setters
 Post.set("name", "My Very Very Cool Post")
@@ -50,9 +53,6 @@ Post.set("name", "My Very Very Cool Post")
 Post.update() // update changes to Mongo
 Posts.findOne("YN2nZmczPsk3jvPuL")
 // {_id: "YN2nZmczPsk3jvPuL", name: "My Very Very Cool Post"}
-
-// And fields are always up to date!
-console.log(post.name); //  "My Very Very Cool Post"
 ```
 
 ## Setup
@@ -154,7 +154,8 @@ console.log(PostCollection.findOne({name: "My Cool Post")};
 Pass in any MongoDB query and it will fetch the first object and instantiate
 it. Will be constantly up to date. This will by default *not be reactive*.
 This is to prevent redundant polling and if you are fetching by Id for
-example, as the object automatically updates its fields anyway.
+example, as the object automatically updates its fields anyway. You can also
+pass in a parameter object that you normally find on `collection.find()`.
 
 ```javascript
 // Online post
@@ -166,9 +167,11 @@ Posts.update("xWDrzEvGGDcwmHA6t", {
 post = Post.fetchOne({commentCount: {$gte: 2}}, {reactive: true})
 ```
 
-#### Fetching array
+#### Fetching multiple records
 Pass in any MongoDB query and get an array of reactively up to date objects.
-This is by default a non-reactive method, unless you pass true to it.
+This is by default a non-reactive method, unless you pass true to it. You can
+also pass in a parameter object that you normally find on `collection.find()`.
+
 
 ```javascript
 posts = Post.fetch({commentsCount: {"$gte": 2}})
