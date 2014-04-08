@@ -14,45 +14,48 @@ changes on the DB.
 
 ## Example
 
-// Setup
+Simple setup, with natural javascript prototype based classes.
 ```javascript
 PostCollection = new Meteor.Collection();
 Post = new ReactiveClass(PostCollection);
 Post.prototype.getName = function() {
   return this.name();
 }
+```
 
-// Instatiating
+Easily create a local object and put it into the DB
+```javascript
 post = new Post({name: "My Cool Post"})
-post.put(); // insert the post into the database
+console.log(post) // {name: "My Cool Post"}
+post.put();
 console.log(post) // {_id: "YN2nZmczPsk3jvPuL", name: "My Cool Post"}
+```
 
-// Reactive access / setting
-console.log(post.name); // non-reactive access
+Reactively track the object!
+```javascript
 Deps.autorun(function() {
-  // reactive access
   console.log("Name changed, it is now: " + post.get("Name"));
 });
+```
 
+Update the object just like how you would any other, and reflect those changes
+on mongo.
+```javascript
+post.name = "My Pretty Cool Pet";
+post.update();
+// Name changed, it is now: My Very Cool Post
+```
+
+Collection updates automatically invalidate the object and updates all its
+fields.
+```javascript
 PostCollection.update({name: "My Cool Post"},
   {
     "$set": {name: "My Very Cool Post"}
   }
 ); 
-// Output: Name changed, it is now: My Very Cool Post
-// (Computation was invalidated)
+// Name changed, it is now: My Very Cool Post
 console.log(post.name); // My Very Cool Post
-
-
-// Reactive setters
-Post.set("name", "My Very Very Cool Post")
-// Output: Name changed, it is now: My Very Very Cool Post
-// (Computation was invalidated)
-// However, this new change isn't in MongoDB yet
-
-Post.update() // update changes to Mongo
-Posts.findOne("YN2nZmczPsk3jvPuL")
-// {_id: "YN2nZmczPsk3jvPuL", name: "My Very Very Cool Post"}
 ```
 
 ## Setup
@@ -158,7 +161,6 @@ example, as the object automatically updates its fields anyway. You can also
 pass in a parameter object that you normally find on `collection.find()`.
 
 ```javascript
-// Online post
 post = Post.fetchOne("YN2nZmczPsk3jvPuL")
 console.log(post); // {_id: "xWDrzEvGGDcwmHA6t", name: "My Post About Dogs"}
 Posts.update("xWDrzEvGGDcwmHA6t", {
@@ -202,6 +204,7 @@ You can watch an object for change explicitly by calling depend on it
 Deps.autorun(function() {
   post.depend();
 });
+post.changed();
 ```
 
 #### Temporarily enabling/disabling reactivity
@@ -215,12 +218,12 @@ post.unlock()
 If you don't want reactive objects at all, just instantiate `ReactiveClass`
 with a second parameter, `{reactive: false}`.
 
-
-## Interacting With Mongo
 ```javascript
 PostCollection = new Meteor.Collection();
 Post = new ReactiveClass(PostCollection, {reactive: false});
 ```
+
+## Interacting With Mongo
 
 #### Taking a local object and putting it into the DB
 Use `.put()` to take an object that only exists locally and put it online.
@@ -228,7 +231,7 @@ Use `.put()` to take an object that only exists locally and put it online.
 ```javascript
 post1 = new Post({name: "My Cool Post"});
 console.log(PostCollection.findOne({name: "My Cool Post")}; // undefined
-post1.put(); // Inserts this into PostCollection
+post1.put();
 console.log(post1); // {_id: "YN2nZmczPsk3jvPuL", name: "My Cool Post"}
 ```
 
@@ -271,9 +274,9 @@ Post.removeOfflineField(["currentPage"]);
 post = Post.create({name: "Cool Post"});
 post.currentPage = 2;
 post.currentComment = 3;
-post.update()
+post.update();
 console.log(Posts.findOne({name: "Cool Post"}));
 // {_id: "YN2nZmczPsk3jvPuL", name: "Cool Post", }
-console.log(post)
+console.log(post);
 ```
 
