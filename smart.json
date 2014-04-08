@@ -1,0 +1,9 @@
+{
+  "name": "reactive-class",
+  "description": "Reactive Classes backed by Meteor Collections.",
+  "homepage": "https://github.com/lingz/meteor-reactive-class",
+  "author": "Lingliang Zhang (https://github.com/lingz)",
+  "version": "0.1.0",
+  "git": "https://github.com/lingz/meteor-reactive-class.git",
+  "packages": {}
+}

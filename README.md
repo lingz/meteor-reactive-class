@@ -23,7 +23,12 @@ Post.prototype.getName = function() {
 }
 ```
 
-Easily create a local object and put it into the DB
+Integrate it into your existing codebase without refactoring.
+```javascript
+PostCollection._transform = Post.transform;
+```
+
+Easily create a local object and put it into the DB.
 ```javascript
 post = new Post({name: "My Cool Post"})
 console.log(post) // {name: "My Cool Post"}
@@ -38,8 +43,8 @@ Deps.autorun(function() {
 });
 ```
 
-Update the object just like how you would any other, and reflect those changes
-on mongo.
+Update the object just like how you would any other regular javascript object,
+and reflect those changes on MongoDB.
 ```javascript
 post.name = "My Pretty Cool Pet";
 post.update();
@@ -88,7 +93,11 @@ PostCollection._transform = Post.transform;
 ```
 
 ### Inheritance
-Extend an existing class
+Extend an existing class. This performs multiple inheritance, creating a new
+class that inherits from both the class being extended, and the reactive class
+doing the extending, with the reactive base class getting the higher priority
+(its methods and fields will overwrite the extended class's ones with the same
+name).
 
 ```javascript
 Post = function(name) {
@@ -110,7 +119,9 @@ ReactivePostWithComments = ReactivePost.extend(PostWithComments);
 ```
 
 ### Coffeescript based inheritance
-Easy coffeescript extension that fits well with the syntax
+Easy coffeescript extension that fits well with the syntax. Note that you must
+call `ClassName.initiliaze.call(@)` during the constructor, or the
+ReactiveClass will not correctly get its fields.
 
 ```coffeescript
 PostCollection = new Meteor.Collection("posts");
@@ -118,7 +129,7 @@ class Post extends ReactiveClass(PostCollection)
   constructor: (name) ->
     console.log "Constructing post with name: " + name
     this.name = name
-    ReactiveClass.initiliaze.call(this) # Important! Not optional!
+    Post.initiliaze.call(@) # Important! Not optional!
 
   getName: () ->
     return this.name
@@ -202,7 +213,8 @@ post.unlock()
 
 #### Turning off Reactivity
 If you don't want reactive objects at all, just instantiate `ReactiveClass`
-with a second parameter, `{reactive: false}`.
+with a second parameter, `{reactive: false}`. This will improve performance,
+especially if you have a large number of objects.
 
 ```javascript
 PostCollection = new Meteor.Collection();

@@ -1,4 +1,4 @@
-ReactiveClass = function(collection, opts) {
+ReactiveClass = function(collection, opts, string) {
   var defaultOpts = {
     reactive: true
   };
@@ -10,7 +10,7 @@ ReactiveClass = function(collection, opts) {
   var offline_fields = Array.prototype.slice.call(default_offline_fields);
 
 
-  ReactiveClass = function(fields) {
+  var ReactiveClass = function(fields) {
     _.extend(this, fields);
     ReactiveClass.initialize.call(this);
   };
@@ -34,17 +34,18 @@ ReactiveClass = function(collection, opts) {
   ReactiveClass.transform = function(doc) {
     var firstTime = true;
     var object = new this(doc);
-    Deps.autorun(function() {
-      // don't update again the first time
-      if (firstTime) {
-        firstTime = false;
-        return;
-      }
-      // don't update if the object is not reactive
-      if (!object._reactive)
-        return;
-      _.extend(object, collection.findOne(this._id));
-    });
+    if (options.reactive)
+      Deps.autorun(function() {
+        // don't update again the first time
+        if (firstTime) {
+          firstTime = false;
+          return;
+        }
+        // don't update if the object is not reactive
+        if (!object._reactive)
+          return;
+        _.extend(object, collection.findOne(this._id));
+      });
     return object;
   };
 
@@ -159,15 +160,16 @@ ReactiveClass = function(collection, opts) {
     var firstTime = true;
     var id = collection.insert(this.sanitize(true));
     this._id = id;
-    Deps.autorun(function() {
-      if (firstTime) {
-        firstTime = false;
-        return;
-      }
-      if (!this._reactive)
-        return;
-      _.extend(this, collection.findOne(this._id));
-    });
+    if (options.reactive)
+      Deps.autorun(function() {
+        if (firstTime) {
+          firstTime = false;
+          return;
+        }
+        if (!this._reactive)
+          return;
+        _.extend(this, collection.findOne(this._id));
+      });
     return this;
   };
 
@@ -225,21 +227,6 @@ ReactiveClass = function(collection, opts) {
     return this;
   };
 
-  // extending
-  var __hasProp = {}.hasOwnProperty,
-  __extends = function(child, parent) { 
-    for (var key in parent) { 
-      if (__hasProp.call(parent, key))
-        child[key] = parent[key]; 
-    } 
-    function ctor() { 
-      this.constructor = child; 
-    } 
-    ctor.prototype = parent.prototype;
-    child.prototype = new ctor();
-    return child; 
-  };
-
   ReactiveClass.extend = function(childClass) {
     var args = Array.prototype.splice(arguments);
     var constructor, collection;
@@ -248,17 +235,20 @@ ReactiveClass = function(collection, opts) {
         "You must specify the collection you are extending"
       );
     else {
-      if (typeof(args[0]) != "function")
-        throw new Meteor.Error(500,
-          "You must specify the collection you are extending"
-        );
-      collection = args[1];
       constructor = function() {
-        childClass.call(this);
+        childClass.apply(this, arguments);
         ReactiveClass.initialize.call(this);
+        return this;
       };
-      __extends(constructor, childClass);
-      __extends(constructor, ReactiveClass);
+      var dummyClass = function() {};
+      // multiple inheritance, from both the extended class, and from itself.
+      _.extend(dummyClass.prototype, childClass.prototype);
+      _.extend(dummyClass.prototype, this.prototype);
+      _.extend(constructor, childClass);
+      _.extend(constructor, this);
+      constructor.prototype = new dummyClass();
+      console.log("FINAL CONSTRUCTOR");
+      console.log(constructor);
     }
     return constructor;
   };
