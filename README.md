@@ -12,6 +12,8 @@ It also acts as a database wrapper over MongoDB and allows for simply
 changing fields in a natural way and calling `.update()` to reflect those
 changes on the DB.
 
+[![Build Status](https://travis-ci.org/lingz/meteor-reactive-class.svg)](https://travis-ci.org/lingz/meteor-reactive-class)
+
 ## Example
 
 Simple setup, with natural javascript prototype based classes.
