@@ -78,7 +78,7 @@ Post = new ReactiveClass(PostCollection, {
 Here are the options:
 
 Field               | Default   | Explanation
----------------------------------
+--------------------|-----------|------------
 reactive            | true      | Whether objects reactively update with the collection.
 transformCollection | true      | Whether collection queries automatically return objects cast into this class. Set to false if you are using the same collection for multiple classes.
 
