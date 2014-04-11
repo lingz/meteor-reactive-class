@@ -82,7 +82,6 @@ Tinytest.add("ReactiveClass - Client Instantiation", function(test) {
   post.put(); 
   test.isTrue(PostCollection.find().count() === 1, "locally put objects should be in the database");
   test.isTrue(_.has(post, "_id"), "local put objects should have an _id");
-  console.log(PostCollection.findOne());
   test.isTrue(PostCollection.findOne().name == post.name, "locally put objects should have their fields correctly inserted");
 });
 

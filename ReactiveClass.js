@@ -135,11 +135,11 @@ ReactiveClass = function(collection, opts) {
       if (newSelf)
         _.extend(self, collection.findOne(self._id));
       else {
-        this._exists = false;
-        this._mongoTracker = null;
+        self._exists = false;
+        self._mongoTracker = null;
         c.stop();
       }
-      this._dep.changed();
+      self.changed();
     });
   };
 
@@ -185,13 +185,14 @@ ReactiveClass = function(collection, opts) {
         "$set": this.sanitize()
       }, callback);
     }
+    this.changed();
   };
 
 
   // Removes a database entry
   ReactiveClass.prototype.remove = function(callback) {
     var self = this;
-    var removeCallback = function(e) {
+    var removeCallback = function(error) {
       if (error)
         throw error;
       self._exists = false;
@@ -205,12 +206,13 @@ ReactiveClass = function(collection, opts) {
       };
     }
     collection.remove(this._id, removeCallback);
+    this.changed();
   };
 
   // Inserts an entry into a database for the first time
   ReactiveClass.prototype.put = function(originalCallback) {
     var self = this;
-    var insertCallback = function(e) {
+    var insertCallback = function(error) {
       if (error)
         throw error;
       self._setupReactivity(true);

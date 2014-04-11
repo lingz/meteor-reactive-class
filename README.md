@@ -143,17 +143,26 @@ class Post extends ReactiveClass(PostCollection)
     return this.name
 ```
 
-
 ## Instantiating Objects
 
 #### Client instantiation
 Objects can be created on the client and not linked to any object in the
 collection. When ready to insert it into the collection, just call `.put()`.
+You can use `.exists()` to reactively check if an object is in the MongoDB
+record. Note that all database operations are asynchronous on the client, and
+need to be validated against the server. `.exists()` only changes after this
+process is complete.
 
 ```javascript
-post1 = new Post({name: "My Cool Post"});
-post1.put();
+post = new Post({name: "My Cool Post"});
+console.log(post.exists());
+>> false
+post.put(function() {
+  console.log(post.exists());
+});
+>> true
 ```
+
 
 ## Transformations
 Once you've assigned a collection to a class, objects of this class
@@ -172,6 +181,95 @@ return objects instead of cursors always.
 ```javascript
 post = Post.fetchOne({commentCount: {$gte: 2}});
 posts = Post.fetch({commentsCount: {"$gte": 2}});
+```
+
+## Interacting With Mongo
+
+#### Taking a local object and putting it into the DB
+Use `.put(callback)` to take an object that only exists locally and put it online.
+Note that database inserts are asynchronous on the client. Use `.exists()` to
+check if the record was successfully inserted. Nevertheless, it will appear as
+though the object was inserted instantly, due to Meteor's latency
+compensation.
+
+```javascript
+post1 = new Post({name: "My Cool Post"});
+console.log(PostCollection.findOne({name: "My Cool Post")};
+>> undefined
+
+post1.put(function() {
+  console.log("Post database status: " + post1.exists())
+});
+console.log(PostCollection.findOne({name: "My Cool Post")};
+>> {_id: "YN2nZmczPsk3jvPuL", name: "My Cool Post"}
+```
+
+#### Creating an object for the DB
+Use `.create(callback)` which has the same signature as `.insert()` to
+instantiate a new object and put it into the database straight away, in one
+step. This has the same asynchronosity behavior as `.put()`, where it will
+appear to complete instantly but is in fact asnychronous until it receives
+acknowledgement from the server that the record successfully inserted. Use
+`.exists()` to check if it exists in the database.
+
+```javascript
+var newPost = PostCollection.create({name: "New Post"});
+PostCollection.findOne({name: "New Post"}); 
+>> {_id: "YN2nZmczPsk3jvPuL", name: "New Post"}
+```
+
+#### Updating local changes to Mongo
+Call `update()` to update MongoDB with all current fields. You can also use
+`update(query)` to make an update query with the current object.
+
+```javascript
+post = new Post.create({name: "Cool Post"});
+post.name = "Very Cool Post";
+post.update();
+PostCollection.findOne({name: "Very Cool Post"})
+>> {_id: "YN2nZmczPsk3jvPuL", name: "Very Cool Post"}
+
+post.update({
+  $set: {name: "Very Very Cool Post"}
+})
+console.log(post)
+>> {_id: "YN2nZmczPsk3jvPuL", name: "Very Very Cool Post"}
+```
+
+#### Forcing a refresh
+You can also force Mongo to fetch the latest version of a document with
+`.refresh()`.
+```javascript
+post.refresh();
+```
+
+#### Removing an object
+You can make an object remove its corresponding record with
+`.remove(callback)`. Again, we have the same behavior as was described with
+`.put()`, where it will appear to work instantly, but needs to asynchronously
+validate the remove with the server. Again use `.exists()` to check if it is
+still in the database.
+
+```
+post.remove(function() {
+  console.log("Post existence status": post.exists());
+};
+console.log(post.exists());
+>> true // note that the remove function is asnychronous on the client.
+```
+
+#### Adding / Removing offline fields
+Sometimes you want your object to hold fields that do not get put into mongo.
+```javascript
+Post.addOfflineField(["currentComment", "currentPage"]);
+Post.removeOfflineField(["currentPage"]);
+post = Post.create({name: "Cool Post"});
+post.currentPage = 2;
+post.currentComment = 3;
+post.update();
+console.log(PostCollection.findOne({name: "Cool Post"}));
+// {_id: "YN2nZmczPsk3jvPuL", name: "Cool Post", }
+console.log(post);
 ```
 
 ## Reactivity
@@ -310,93 +408,3 @@ anyway, as the objects are getting recreated everytime
 PostCollection = new Meteor.Collection();
 Post = new ReactiveClass(PostCollection, {reactive: false});
 ```
-
-## Interacting With Mongo
-
-#### Taking a local object and putting it into the DB
-Use `.put(callback)` to take an object that only exists locally and put it online.
-Note that database inserts are asynchronous on the client. Use `.exists()` to
-check if the record was successfully inserted. Nevertheless, it will appear as
-though the object was inserted instantly, due to Meteor's latency
-compensation.
-
-```javascript
-post1 = new Post({name: "My Cool Post"});
-console.log(PostCollection.findOne({name: "My Cool Post")};
->> undefined
-
-post1.put(function() {
-  console.log("Post database status: " + post1.exists())
-});
-console.log(PostCollection.findOne({name: "My Cool Post")};
->> {_id: "YN2nZmczPsk3jvPuL", name: "My Cool Post"}
-```
-
-#### Creating an object for the DB
-Use `.create(callback)` which has the same signature as `.insert()` to
-instantiate a new object and put it into the database straight away, in one
-step. This has the same asynchronosity behavior as `.put()`, where it will
-appear to complete instantly but is in fact asnychronous until it receives
-acknowledgement from the server that the record successfully inserted. Use
-`.exists()` to check if it exists in the database.
-
-```javascript
-var newPost = PostCollection.create({name: "New Post"});
-PostCollection.findOne({name: "New Post"}); 
->> {_id: "YN2nZmczPsk3jvPuL", name: "New Post"}
-```
-
-#### Updating local changes to Mongo
-Call `update()` to update MongoDB with all current fields. You can also use
-`update(query)` to make an update query with the current object.
-
-```javascript
-post = new Post.create({name: "Cool Post"});
-post.name = "Very Cool Post";
-post.update();
-PostCollection.findOne({name: "Very Cool Post"})
->> {_id: "YN2nZmczPsk3jvPuL", name: "Very Cool Post"}
-
-post.update({
-  $set: {name: "Very Very Cool Post"}
-})
-console.log(post)
->> {_id: "YN2nZmczPsk3jvPuL", name: "Very Very Cool Post"}
-```
-
-#### Forcing a refresh
-You can also force Mongo to fetch the latest version of a document with
-`.refresh()`.
-```javascript
-post.refresh();
-```
-
-#### Removing an object
-You can make an object remove its corresponding record with
-`.remove(callback)`. Again, we have the same behavior as was described with
-`.put()`, where it will appear to work instantly, but needs to asynchronously
-validate the remove with the server. Again use `.exists()` to check if it is
-still in the database.
-
-```
-post.remove(function() {
-  console.log("Post existence status": post.exists());
-};
-console.log(post.exists());
->> true // note that the remove function is asnychronous on the client.
-```
-
-#### Adding / Removing offline fields
-Sometimes you want your object to hold fields that do not get put into mongo.
-```javascript
-Post.addOfflineField(["currentComment", "currentPage"]);
-Post.removeOfflineField(["currentPage"]);
-post = Post.create({name: "Cool Post"});
-post.currentPage = 2;
-post.currentComment = 3;
-post.update();
-console.log(PostCollection.findOne({name: "Cool Post"}));
-// {_id: "YN2nZmczPsk3jvPuL", name: "Cool Post", }
-console.log(post);
-```
-
