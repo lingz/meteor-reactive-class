@@ -79,8 +79,6 @@ Post = new ReactiveClass(PostCollection, {
 });
 ```
 
-Here are the options:
-
 Field               | Default   | Explanation
 --------------------|-----------|------------
 reactive            | true      | Whether objects reactively update with the collection.
@@ -149,9 +147,10 @@ class Post extends ReactiveClass(PostCollection)
 Objects can be created on the client and not linked to any object in the
 collection. When ready to insert it into the collection, just call `.put()`.
 You can use `.exists()` to reactively check if an object is in the MongoDB
-record. Note that all database operations are asynchronous on the client, and
-need to be validated against the server. `.exists()` only changes after this
-process is complete.
+record. Note that on the client all database operations appear synchronous due
+to latency compensation but in fact need to asynchronously validate all
+operations with the server. `.exists()` only changes after this process is
+complete.
 
 ```javascript
 post = new Post({name: "My Cool Post"});
@@ -209,7 +208,9 @@ PostCollection.findOne({name: "New Post"});
 
 #### Updating local changes to Mongo
 Call `update()` to update MongoDB with all current fields. You can also use
-`update(query)` to make an update query with the current object.
+`update(query)` to make an update query with the current object. The object
+will automatically reflect the updated state it should have after the update
+query.
 
 ```javascript
 post = new Post.create({name: "Cool Post"});
@@ -225,14 +226,6 @@ console.log(post)
 >> {_id: "YN2nZmczPsk3jvPuL", name: "Very Very Cool Post"}
 ```
 
-#### Forcing a refresh
-You can also force Mongo to fetch the latest version of a document with
-`.refresh()`. This is useful if you have reactivity off or locked down with
-`.lock()`.
-```javascript
-post.refresh();
-```
-
 #### Removing an object
 You can make an object remove its corresponding record with
 `.remove(callback)`. Again, we have the same behavior as was described with
@@ -246,6 +239,14 @@ post.remove(function() {
 };
 console.log(post.exists());
 >> true // note that the remove function is asnychronous on the client.
+```
+
+#### Forcing a refresh
+You can also force Mongo to fetch the latest version of a document with
+`.refresh()`. This is useful if you have reactivity off or locked down with
+`.lock()`.
+```javascript
+post.refresh();
 ```
 
 #### Adding / Removing offline fields
@@ -398,3 +399,68 @@ anyway, as the objects are getting recreated everytime
 PostCollection = new Meteor.Collection();
 Post = new ReactiveClass(PostCollection, {reactive: false});
 ```
+
+## Full Specification
+
+Listed here are all the static and instance methods provided through
+ReactiveClass.
+
+*Beware of Namespace conflicts*. Your Mongo object cannot have the same name
+as one of the instance methods, or you will overwrite it. If you have a
+namespace conflict on your object field that cannot be changed, open an issue.
+If this is a common problem, it might add a prefix option, to change the names
+of some methods. However, as it stands, the current terseness is nice.
+
+#### Static Methods
+Static methods are called as such:
+```javascript
+Post = new ReactiveClass(PostCollection);
+Post.staticMethod();
+```
+
+Assuming the class is named Class.
+
+`Class = new ReactiveClass(ClassCollection)`
+
+Signature | Return | Explanation
+----------|--------|------------
+`new Class()` | instance of Class | instantiates a local object. It has no database presence yet
+`.create(object, [callback])` | instance of Class | Creates an object and instantiates it in the database
+`.fetch(selector, [options])` | array of instance of Class | Identical to [Collection.find()](http://docs.meteor.com/#find) except returns an array of class instances instead of a cursor. This method is reactive.
+`.fetchOne(selector, [options])` | instance of Class | Identical to [Collection.findOne()](http://docs.meteor.com/#findone) except it returns an class instance instead of a record. This method is reactive unless an id string is passed in, in which case it is not.
+`.addOfflineFields(newOfflineFields)` | undefined | Adds fields which are not to be synced with MongoDB
+`.removeOfflineFields(toRemoveOfflineFields)` | undefined | Inverse operation of `.addOfflineFields()`
+`.extend(childClass)` | new Class | Creates a new class, which double inherits from both the specified child class, and the current Reactive Class.
+
+#### Instace Methods
+Instance methods are called like this
+```
+var post = new Post({name: "My Cool Post"});
+post.instanceMethod();
+```
+
+Signature | Return | Explanation
+----------|--------|------------
+`.put([callback])` | this | Puts this object into MongoDB
+`.update([modifier], [options], [callback])` | this | If called without arguments, then tries to update all fields of the object with MongoDB. Otherwise, has an idetical signature to [Collection.update()](http://docs.meteor.com/#update), except it specifies the id for you.
+`.remove([callback])` | this | Remove the object's record from MongoDB
+`.exists()` | boolean | returns whether the object exists in mongoDB. Will only change after a database operation has been validated by the server.
+`.santitize()` | object | returns a copy of the object with all offline fields removed.
+`.lock()` | this | Temporarily disables all reactive updates on this object.
+`.unlock()` | this | Re-enables all reactive updates on this object. This won't turn on reactivity, if the class was created with `{reactive: false}`.
+`.refresh()` | this | Synchronizes all fields of the object with mongoDB, even if reactivity is turned off.
+`.get(field)` | value | Reactively returns a top level field of this object
+`.set(field, value)` | this | Sets a top level field of this object and invalidates computations tracking the object. Does not cause a mongoDB update.
+`.changed()` | this | Invalidates all computations tracking this object.
+`.depend()` | this | Makes the current computation reactively track this object.
+
+
+
+
+
+
+
+
+
+
+#### Instance Method

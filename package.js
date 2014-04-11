@@ -14,6 +14,6 @@ Package.on_test(function(api) {
   api.use('tinytest', ['client', 'server']);
   api.use('coffeescript', ['client', 'server']);
   api.use("mongo-livedata");
-  api.add_files("tests/reactiveClassTests.js");
   api.add_files("tests/reactiveClassCoffeeTests.coffee");
+  api.add_files("tests/reactiveClassTests.js");
 });

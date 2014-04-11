@@ -109,3 +109,24 @@ Tinytest.add("ReactiveClass - Creating an object for Mongo", function(test) {
   test.isTrue(PostCollection.findOne({name: "New Post"}), "The created object should have a record in mongo."); 
 
 });
+
+Tinytest.add("ReactiveClass - Updating objects on Mongo", function(test) {
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection);
+
+  post = Post.create({name: "Cool Post"});
+  post.name = "Very Cool Post";
+  post.update();
+
+  test.isTrue(PostCollection.findOne({name: "Very Cool Post"}), "Mongo should have found the updated object");
+  test.isFalse(PostCollection.findOne({name: "Cool Post"}), "Mongo should not find the stale object");
+
+  post.update({
+    $set: {name: "Very Very Cool Post"}
+  });
+
+  console.log(post);
+  test.isTrue(post.name == "Very Very Cool Post", "The object should have the updated state");
+  test.isTrue(PostCollection.findOne({name: "Very Very Cool Post"}), "Mongo should have the updated object");
+});
+

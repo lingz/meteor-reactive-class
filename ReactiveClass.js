@@ -55,26 +55,6 @@ ReactiveClass = function(collection, opts) {
     return object.put(originalCallback);
   };
 
-  ReactiveClass.fetchOne = function() {
-    var record;
-    // we need to check if the argument passed in was a string, so we can make
-    // it non reactive, as it means they are fetching a specific record by id.
-    if (arguments.length > 0 && typeof arguments.length[0] == "string")
-      record = Deps.nonreactive(function() {
-        record = collection.findOne.apply(collection, arguments);
-      });
-    else
-      record = collection.findOne.apply(collection, arguments);
-
-    if (_.isEmpty(record))
-      return undefined;
-
-    if (!options.transformCollection)
-      record = this._transformRecord(record);
-
-    return record;
-  };
-
   // reactively fetch an array of objects
   ReactiveClass.fetch = function() {
     var args;
@@ -97,13 +77,36 @@ ReactiveClass = function(collection, opts) {
     return objects;
   };
 
+  // fetch a single instance of the class. Is reactive unless an _id string is
+  // passed in, in which case it is not reactive.
+  ReactiveClass.fetchOne = function() {
+    var record;
+    // we need to check if the argument passed in was a string, so we can make
+    // it non reactive, as it means they are fetching a specific record by id.
+    if (arguments.length > 0 && typeof arguments.length[0] == "string")
+      record = Deps.nonreactive(function() {
+        record = collection.findOne.apply(collection, arguments);
+      });
+    else
+      record = collection.findOne.apply(collection, arguments);
+
+    if (_.isEmpty(record))
+      return undefined;
+
+    if (!options.transformCollection)
+      record = this._transformRecord(record);
+
+    return record;
+  };
+
+
   // registering an offline field
-  ReactiveClass.addOfflineField = function(newOfflineFields) {
+  ReactiveClass.addOfflineFields = function(newOfflineFields) {
     offline_fields = _.union(offline_fields, newOfflineFields);
   };
 
   // deregistering an offline field
-  ReactiveClass.removeOfflineField = function(toRemoveOfflineFields) {
+  ReactiveClass.removeOfflineFields = function(toRemoveOfflineFields) {
     // we need to protect the default fields
     if (_.intersection(default_offline_fields,
           toRemoveOfflineFields).length > 0)
@@ -112,6 +115,32 @@ ReactiveClass = function(collection, opts) {
         "and cannot be removed"
       );
     offline_fields = _.difference(offline_fields, toRemoveOfflineFields);
+  };
+
+  // Creates a new class, which double inherits from both the specified child
+  // class, and the current Reactive Class.
+  ReactiveClass.extend = function(childClass) {
+    var args = Array.prototype.splice(arguments);
+    var constructor, collection;
+    if (!childClass)
+      throw new Meteor.Error(500,
+        "You must specify the collection you are extending"
+      );
+    else {
+      constructor = function() {
+        childClass.apply(this, arguments);
+        ReactiveClass.initialize.call(this);
+        return this;
+      };
+      var dummyClass = function() {};
+      // multiple inheritance, from both the extended class, and from itself.
+      _.extend(dummyClass.prototype, childClass.prototype);
+      _.extend(dummyClass.prototype, this.prototype);
+      _.extend(constructor, childClass);
+      _.extend(constructor, this);
+      constructor.prototype = new dummyClass();
+    }
+    return constructor;
   };
 
 
@@ -145,17 +174,10 @@ ReactiveClass = function(collection, opts) {
 
   // Get sanitized version of object
   ReactiveClass.prototype.sanitize = function(keepId) {
-    var toRemoveFields = keepId ? offline_fields.concat("_id") : offline_fields;
+    var toRemoveFields = keepId ? offline_fields : offline_fields.concat("_id");
     return _.omit(this, toRemoveFields);
   };
 
-  // reflect all current updates onto mongo
-  var defaultUpdateCallback = function(err, numUpdated) {
-    if (err)
-      throw new Meteor.Error(500,
-        "Update of object with _id " + this._id
-      );
-  };
 
   // Checks if there are any remaining data fields on this object.
   ReactiveClass.prototype.exists = function() {
@@ -168,24 +190,32 @@ ReactiveClass = function(collection, opts) {
   // optional callback for failure / success.
   ReactiveClass.prototype.update = function() {
     var args, callback;
+    var self = this;
+    var defaultUpdateCallback = function(err, numUpdated) {
+      if (err)
+        throw err;
+    };
+
     // extract callback if present
-    if (typeof(args[args.length - 1]) == "function") {
-      callback = args[args.length - 1];
+    if (arguments.length > 0 && typeof(arguments[arguments.length - 1]) == "function") {
+      callback = args[arguments.length - 1];
       args = Array.prototype.slice.call(arguments, 0, arguments.length - 1);
     } else {
       callback = defaultUpdateCallback;
       args = Array.prototype.slice.call(arguments);
     }
+
     // do an update query or just reflect the update on the current object
     if (args.length > 0) {
-      collection.update.apply(_.union([this._id], args, callback));
-      if (!this._reactive) this.refresh();
+      collection.update.apply(collection, _.union([this._id], args, callback));
     } else {
       collection.update(this._id, {
         "$set": this.sanitize()
       }, callback);
     }
+    this.refresh();
     this.changed();
+    return this;
   };
 
 
@@ -207,6 +237,7 @@ ReactiveClass = function(collection, opts) {
     }
     collection.remove(this._id, removeCallback);
     this.changed();
+    return this;
   };
 
   // Inserts an entry into a database for the first time
@@ -239,7 +270,6 @@ ReactiveClass = function(collection, opts) {
   // Turns on reactivity again, 
   ReactiveClass.prototype.unlock = function() {
     this._reactive = false;
-    this.refresh();
     return this;
   };
 
@@ -257,6 +287,7 @@ ReactiveClass = function(collection, opts) {
         this._id + " was found in the collection."
       );
     _.extend(this, newFields);
+    this.changed();
     return this;
   };
 
@@ -284,29 +315,6 @@ ReactiveClass = function(collection, opts) {
     return this;
   };
 
-  ReactiveClass.extend = function(childClass) {
-    var args = Array.prototype.splice(arguments);
-    var constructor, collection;
-    if (!childClass)
-      throw new Meteor.Error(500,
-        "You must specify the collection you are extending"
-      );
-    else {
-      constructor = function() {
-        childClass.apply(this, arguments);
-        ReactiveClass.initialize.call(this);
-        return this;
-      };
-      var dummyClass = function() {};
-      // multiple inheritance, from both the extended class, and from itself.
-      _.extend(dummyClass.prototype, childClass.prototype);
-      _.extend(dummyClass.prototype, this.prototype);
-      _.extend(constructor, childClass);
-      _.extend(constructor, this);
-      constructor.prototype = new dummyClass();
-    }
-    return constructor;
-  };
 
   return ReactiveClass;
 };
