@@ -149,17 +149,25 @@ class Post extends ReactiveClass(PostCollection)
 
 ## Interacting With Mongo
 
-### Client instantiation
+### Instantiating Objects
 Objects can be created on the client and not linked to any object in the
 collection. When ready to insert it into the collection, just call `.put()`.
-You can use `.exists()` to reactively check if an object is in the MongoDB
-record. Note that on the client all database operations appear synchronous due
+Alternatively, call `.create()`, which both instantiates a local object, and
+inserts it into mongoDB.
+
+Note that on the client all database operations appear synchronous due
 to latency compensation but in fact need to asynchronously validate all
-operations with the server. 
+operations with the server. Use `.exists()` to reactively check if it exists
+in the database.
 
 ```javascript
-post = new Post({name: "My Cool Post"});
+Post = new ReactiveClass(PostCollection);
+
+var post = new Post({name: "My Cool Post"});
 post.put()
+
+// or just create directly
+var newPost = Post.create({name: "New Post"});
 ```
 
 ### Fetching objects
@@ -178,31 +186,18 @@ return objects instead of cursors always.
 
 With Transform:
 ```javascript
-var PostCollection = new Meteor.Collection(null);
 var Post = new ReactiveClass(PostCollection);
+
 post = PostCollection.findOne({commentCount: {$gte: 2}});
 posts = PostCollection.find({commentsCount: {"$gte": 2}});
 ```
 
 Without Transform:
 ```javascript
-var PostCollection = new Meteor.Collection(null);
 var Post = new ReactiveClass(PostCollection, {transformCollection: false});
+
 post = Post.fetchOne({commentCount: {$gte: 2}});
 posts = Post.fetch({commentsCount: {"$gte": 2}});
-```
-
-### Creating an object for the DB
-Use `.create(callback)` which has the same signature as `.insert()` to
-instantiate a new object and put it into the database straight away, in one
-step. This has the same asynchronosity behavior as `.put()`, where it will
-appear to complete instantly but might fail when validating against the server
-Use `.exists()` to reactively check if it exists in the database.
-
-```javascript
-var newPost = Post.create({name: "New Post"});
-PostCollection.findOne({name: "New Post"}); 
->> {_id: "YN2nZmczPsk3jvPuL", name: "New Post"}
 ```
 
 ### Keeping in sync with MongoDB
@@ -241,7 +236,7 @@ references to an object. The `.poll()` method returns a computation object. To
 stop the polling, either call `.stop()` on this computation object, or call
 `object.stopPoll()`. This allows the object to get garbage collected again.
 
-#### Polling Refresh
+#### Polling refresh
 ```javascript
 post = new Post.create({name: "Cool Post"});
 var computation = post.poll();
@@ -296,7 +291,7 @@ console.log(post);
 
 ## Reactivity
 
-### Reactive Queries
+### Queries
 You may want to use reactive or non-reactive queries depending on whether you
 want to maintain state on the object itself. Reactive queries have the
 advantage that your object data is always on the live-data. However, they have
@@ -354,12 +349,11 @@ console.log(post.page);
 >> 2 // we still have the original object
 ```
 
-### Using set/get
-You can use setters and getters to make your access / modifications straight
-away. Essentially, this treats the entire object as if it was a `Session`
-variable. `.set()` operations are **not** reflected on MongoDB, and it is
-required you call `.update()` after if you want the changes to carry over to
-mongoDB.
+### Using Set / Get
+You can use setters and getters to make your access / modifications reactive.
+Essentially, this treats the entire object as if it was a `Session` variable.
+`.set()` operations are **not** reflected on MongoDB, and it is required you
+call `.update()` after if you want the changes to carry over to mongoDB.
 
 ```javascript
 post = Post.create({name: "My Post"})
@@ -371,11 +365,11 @@ post.set("name", "My cool post");
 >> {_id: "YN2nZmczPsk3jvPuL", name: "My cool post"}
 ```
 
-### Using Depend/Changed explicitly
+### Using Depend / Changed
 You can watch an object for change explicitly by calling depend on it. Then,
 when the object changes via, `.set()`, `.poll()`, `.update()` or `.refresh()`,
 the computation will re-run. Note, that direct assignments will not invalidate
-the object, however, ou can use `.changed()` to invalidate it manually.
+the object, however, or you can use `.changed()` to invalidate it manually.
 
 ```javascript
 Deps.autorun(function() {
@@ -385,7 +379,7 @@ post.name = "New Name";
 post.changed();
 ```
 
-### Locking to enable/disable reactivity
+### Use Lock / Unlock to toggle reactivity
 Sometimes you don't want an object to reactively update for a period of time.
 This might be because, you are temporarily setting fields, and don't want them
 to get overwriten by a `.poll()` or `.refresh()`, or maybe you just want to
