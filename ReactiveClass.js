@@ -7,7 +7,7 @@ ReactiveClass = function(collection, opts) {
 
   // offline fields which we are not going to sync with mongoDB, and its clone
   // containing the mutable version
-  var default_offline_fields = ["_dep", "_reactive"];
+  var default_offline_fields = ["_dep", "_reactive", "_exists", "_mongoTracker"];
   var offline_fields = Array.prototype.slice.call(default_offline_fields);
 
   var ReactiveClass = function(fields) {
@@ -35,6 +35,8 @@ ReactiveClass = function(collection, opts) {
   ReactiveClass.initialize = function () {
     this._dep = new Deps.Dependency();
     this._reactive = options.reactive;
+    this._exists = false;
+    this._mongoTracker = null;
   };
 
   // Takes a record returned from MongoDB and makes it into an instance of
@@ -43,94 +45,55 @@ ReactiveClass = function(collection, opts) {
     var object = new this(doc);
     if (options.reactive)
       object._setupReactivity();
+    object._exists = true;
     return object;
   };
 
   // static methods
-  ReactiveClass.create = function(fields) {
-    var id = collection.insert(params);
-    return this.fetchOne(id);
-  };
-
-  // set the options based on some defaults. This sets it potentially, as the
-  // object passed in might not actually be an options object, so we need to
-  // first check that. This mutates the options object passed in, and returns
-  // a boolean dictating whether the options object was foudn or not.
-  var setOptions = function(defaultOptions, possibleOptions) {
-    var hasOptions = false;
-    for (var key in possibleOptions) {
-      if (_.has(defaultOptions, key)) {
-        hasOptions = true;
-        break;
-      }
-    }
-    if (hasOptions)
-      _.extend(defaultOptions, possibleOptions);
-    return hasOptions;
+  ReactiveClass.create = function(newObject, originalCallback) {
+    var object = new this(newObject);
+    return object.put(originalCallback);
   };
 
   ReactiveClass.fetchOne = function() {
-    var record, args, hasOptions = false;
-    var local_options = {
-      reactive: true
-    };
-    if (arguments.length > 0)
-      hasOptions = setOptions(options, arguments[arguments.length - 1]); 
-
-    if (hasOptions) {
-      args = Array.prototype.slice.call(arguments, 0, arguments.length - 1);
-    } else {
-      args = Array.prototype.slice.call(arguments);
-    }
-
-    if (local_options.reactive)
-      record = collection.findOne.apply(collection, args);
-    else
+    var record;
+    // we need to check if the argument passed in was a string, so we can make
+    // it non reactive, as it means they are fetching a specific record by id.
+    if (arguments.length > 0 && typeof arguments.length[0] == "string")
       record = Deps.nonreactive(function() {
-        return collection.findOne.apply(collection, args);
+        record = collection.findOne.apply(collection, arguments);
       });
+    else
+      record = collection.findOne.apply(collection, arguments);
+
     if (_.isEmpty(record))
       return undefined;
+
     if (!options.transformCollection)
       record = this._transformRecord(record);
+
     return record;
   };
 
   // reactively fetch an array of objects
   ReactiveClass.fetch = function() {
-    var args, hasOptions = false;
-    var local_options = {
-      reactive: true
-    };
-    if (arguments.length > 0)
-      hasOptions = setOptions(options, arguments[arguments.length - 1]); 
-
-    if (hasOptions) {
-      args = Array.prototype.slice.call(arguments, 0, arguments.length - 1);
-    } else {
-      args = Array.prototype.slice.call(arguments);
-    }
+    var args;
 
     var objects = [];
     // when this reactively reruns, it will delete all objects of the array
     // and create them fresh
-    var queryResults;
-    if (options.reactive) {
-      queryResults = collection.find.apply(apply, args).fetch();
-    } else {
-      Deps.nonreactive(function() {
-        queryResults = collection.find.apply(apply, args).fetch();
-      });
-    }
+    var queryResults = collection.find.apply(apply, args).fetch();
 
     // for each of the objects in the list, creative a reactively updating
     // object and insert it into the ith position of the array, only if we
     // aren't already transforming.
-    var self = this;
-    if (!options.transformCollection)
+    if (!options.transformCollection) {
+      var self = this;
       _.map(queryResults, function(record) {
         self._transformRecord(record);
       });
+    }
+
     return objects;
   };
 
@@ -157,17 +120,26 @@ ReactiveClass = function(collection, opts) {
   // Setup Reactivity - tells the object to start listening for changes to
   // itself from the server, and if anything changes, it pulls them
   // automatically.
-  ReactiveClass.prototype._setupReactivity = function() {
-    var firstTime = true;
+  ReactiveClass.prototype._setupReactivity = function(runFirstTime) {
+    var firstTime = runFirstTime ? false : true;
     var self = this;
-    Deps.autorun(function() {
+    var newSelf;
+    this._mongoTracker = Deps.autorun(function(c) {
       if (!self._reactive)
         return;
       if (firstTime) {
         firstTime = false;
         return;
       }
-      _.extend(self, collection.findOne(self._id));
+      newSelf = collection.findOne(self._id);
+      if (newSelf)
+        _.extend(self, collection.findOne(self._id));
+      else {
+        this._exists = false;
+        this._mongoTracker = null;
+        c.stop();
+      }
+      this._dep.changed();
     });
   };
 
@@ -183,6 +155,12 @@ ReactiveClass = function(collection, opts) {
       throw new Meteor.Error(500,
         "Update of object with _id " + this._id
       );
+  };
+
+  // Checks if there are any remaining data fields on this object.
+  ReactiveClass.prototype.exists = function() {
+    this._dep.depend();
+    return this._exists;
   };
 
   // can be optionally called with an update operator. Otherwise, it will just
@@ -209,12 +187,44 @@ ReactiveClass = function(collection, opts) {
     }
   };
 
+
+  // Removes a database entry
+  ReactiveClass.prototype.remove = function(callback) {
+    var self = this;
+    var removeCallback = function(e) {
+      if (error)
+        throw error;
+      self._exists = false;
+      self._mongoTracker.stop();
+      self._mongoTracker = null;
+    };
+    if (callback) {
+      removeCallback = function() {
+        callback();
+        removeCallback();
+      };
+    }
+    collection.remove(this._id, removeCallback);
+  };
+
   // Inserts an entry into a database for the first time
-  ReactiveClass.prototype.put = function() {
-    var id = collection.insert(this.sanitize(true));
-    this._id = id;
-    if (options.reactive)
-      this._setupReactivity();
+  ReactiveClass.prototype.put = function(originalCallback) {
+    var self = this;
+    var insertCallback = function(e) {
+      if (error)
+        throw error;
+      self._setupReactivity(true);
+      self._exists = true;
+    };
+
+    if (originalCallback)
+      callback = function() {
+        arguments[1]();
+        insertCallback();
+      };
+    else
+      callback = insertCallback;
+    this._id = collection.insert(this.sanitize(true), callback);
     return this;
   };
 

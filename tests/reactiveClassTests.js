@@ -86,3 +86,14 @@ Tinytest.add("ReactiveClass - Client Instantiation", function(test) {
   test.isTrue(PostCollection.findOne().name == post.name, "locally put objects should have their fields correctly inserted");
 });
 
+Tinytest.add("ReactiveClass - Fetching from Database", function(test) {
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection, {transformCollection: false});
+  var postId = PostCollection.insert({name: "My Cool Post"});
+
+  var post = Post.fetchOne(postId);
+  test.isTrue(post, "Should be able to fetch by Id");
+
+  var queriedPost = Post.fetchOne({name: "My Cool Post"});
+  test.isTrue(queriedPost, "Should be also able to fetch by query");
+});
