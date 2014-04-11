@@ -82,7 +82,7 @@ Post = new ReactiveClass(PostCollection, {
 
 Field               | Default   | Explanation
 --------------------|-----------|------------
-reactive            | true      | Whether objects reactively update with the collection.
+reactive            | true      | Whether objects are reactively kept in sync with the Meteor collection.
 transformCollection | true      | Whether collection queries automatically return objects cast into this class. Set to false if you are using the same collection for multiple classes.
 
 ## Setup
@@ -396,11 +396,12 @@ post.unlock()
 ```
 
 #### Turning off Reactivity
-If you don't want reactive objects at all, just instantiate `ReactiveClass()`
-with a second parameter, `{reactive: false}`. This will improve performance,
-especially if you have a large number of objects. Turning off reactivity is
-also a good idea when all objects are instantiated by reactive queries
-anyway, as the objects are getting recreated everytime
+If you don't want the objects reactively backed by Meteor Collections at all,
+just instantiate `ReactiveClass()` with a second parameter, `{reactive:
+false}`. This will improve performance, especially if you have a large number
+of objects. Turning off reactivity is also a good idea when all objects are
+instantiated by reactive queries anyway, as the objects are getting recreated
+everytime.
 
 ```javascript
 PostCollection = new Meteor.Collection();
@@ -461,13 +462,3 @@ Signature | Return | Explanation
 `.changed()` | this | Invalidates all computations tracking this object.
 `.depend()` | this | Makes the current computation reactively track this object.
 
-
-
-
-
-
-
-
-
-
-#### Instance Method

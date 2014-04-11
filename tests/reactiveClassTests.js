@@ -303,4 +303,22 @@ Tinytest.addAsync("ReactiveClass - Locking and Unlocking", function(test, next) 
   }, 0);
 });
 
+Tinytest.addAsync("ReactiveClass - Turning Off Reactivity", function(test, next) {
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection, {reactive: false});
 
+  var post = Post.create({name: "Cool Post"});
+
+  PostCollection.update(post._id, {
+    $set: {name: "Very Very Cool Post"}
+  });
+
+  Meteor.setTimeout(function() {
+    test.isFalse(post.name == "Very Very Cool Post", "The object should not update reactively when reactivity is off");
+    test.isTrue(PostCollection.findOne({name: "Very Very Cool Post"}), "Mongo should have the updated object");
+
+    post.refresh();
+    test.isTrue(post.name == "Very Very Cool Post", "The object should still be able to update through manual refresh");
+    next();
+  }, 0);
+});
