@@ -1,17 +1,16 @@
 #Reactive Class for Meteor
 
-Reactive classes with data reactively backed by Meteor collections! Allows the
-attachment of arbitary methods or fields through prototype based classes.
-Allows for simple two way data binding, as well as for Object Oriented
-Programming without losing any of the benefits of reactive Meteor collections.
-Objects automatically update their fields whenever minimongo reactively
-reports that their corresponding entry has changed. Objects are _not
-reinstantiated_ when the corresponding collection record updates and therefore
-can maintain state.
+Reactive classes with data backed by Meteor collections! Allows for simple two
+way data binding, as well as for Object Oriented Programming without losing
+any of the benefits of reactive Meteor collections. Objects are _not
+reinstantiated_ when syncing with the corresponding collection record updates
+and therefore can maintain state.
 
-It also acts as a database wrapper over MongoDB and allows for simply changing
-fields in a natural way and calling `.update()` to reflect those changes on
-the DB. Utilizes 
+It also acts as a database wrapper over MongoDB and allows for simply managing
+data in a natural, object oriented way. Call `.update()` to reflect local
+changes in the DB, and `.refresh()` to get changes in the DB onto the local
+object! Alternatively, use the polling mode, and have the objects listen for
+mongoDB updates, and update themselves reactively.
 
 [![Build Status](https://travis-ci.org/lingz/meteor-reactive-class.svg)](https://travis-ci.org/lingz/meteor-reactive-class)
 
@@ -64,7 +63,8 @@ PostCollection.update({name: "My Cool Post"},
     "$set": {name: "My Very Cool Post"}
   }
 ); 
-Meteor.setTimeout(function() {console.log(post.name);}, 0); 
+post.refresh();
+console.log(post.name);
 >> Name changed, it is now: My Very Cool Post // Invalidated autorun
 >> My Very Cool Post // local object got updated also
 ```
@@ -82,7 +82,7 @@ Post = new ReactiveClass(PostCollection, {
 
 Field               | Default   | Explanation
 --------------------|-----------|------------
-reactive            | true      | Whether objects are reactively kept in sync with the Meteor collection.
+reactive            | true      | Whether objects are by default reactive, that is their setters invalidate.
 transformCollection | true      | Whether collection queries automatically return objects cast into this class. Set to false if you are using the same collection for multiple classes.
 
 ## Setup
@@ -157,10 +157,7 @@ complete.
 post = new Post({name: "My Cool Post"});
 console.log(post.exists());
 >> false
-post.put(function() {
-  console.log(post.exists());
-});
->> true
+post.put()
 ```
 
 #### Fetching objects
@@ -207,24 +204,58 @@ PostCollection.findOne({name: "New Post"});
 >> {_id: "YN2nZmczPsk3jvPuL", name: "New Post"}
 ```
 
-#### Updating local changes to Mongo
+#### Keeping in sync with MongoDB
 Call `update()` to update MongoDB with all current fields. You can also use
 `update(query)` to make an update query with the current object. The object
 will automatically reflect the updated state it should have after the update
-query.
+query. Use `.refresh()` to pull all the latest fields from MongoDB and update
+the local object.
 
 ```javascript
 post = new Post.create({name: "Cool Post"});
 post.name = "Very Cool Post";
 post.update();
-PostCollection.findOne({name: "Very Cool Post"})
+PostCollection.findOne({name: "Very Cool Post"});
 >> {_id: "YN2nZmczPsk3jvPuL", name: "Very Cool Post"}
 
 post.update({
   $set: {name: "Very Very Cool Post"}
-})
-console.log(post)
+});
+post.refresh();
+console.log(post);
 >> {_id: "YN2nZmczPsk3jvPuL", name: "Very Very Cool Post"}
+```
+
+The other option is to use `.poll()`, where the object will listen for changes
+from the DB. Use with care and only if you really need it. When an object is
+polling, it _cannot be garbage collected_, and if you are programmatically
+polling a large number of objects, you may cause memory leaks. Thus, you must
+ensure that you stop all polling before you lose references to an object. The
+`.poll()` method returns a computation object. To stop the polling, either
+call `.stop()` on this computation object, or call `object.stopPoll()`. This
+allows the object to get garbage collected again.
+
+```javascript
+post = new Post.create({name: "Cool Post"});
+var computation = post.poll();
+
+Deps.autorun(function() {
+  console.log("New name: " + post.get("name"));
+});
+
+post.update({
+  $set: {name: "Very Very Cool Post"}
+});
+>> "New name: Very Very Cool Post"
+
+post.update({
+  $set: {name: "Very Very Very Cool Post"}
+});
+>> "New name: Very Very Very Cool Post"
+
+// Call one of the two below to end the poll
+computation.stop();
+post.stopPoll();
 ```
 
 #### Removing an object
@@ -240,14 +271,6 @@ post.remove(function() {
 };
 console.log(post.exists());
 >> true // note that the remove function is asnychronous on the client.
-```
-
-#### Forcing a refresh
-You can also force Mongo to fetch the latest version of a document with
-`.refresh()`. This is useful if you have reactivity off or locked down with
-`.lock()`.
-```javascript
-post.refresh();
 ```
 
 #### Adding / Removing offline fields
@@ -269,12 +292,11 @@ console.log(post);
 ## Reactivity
 
 #### Reactive Queries
-As Reactive Classes automatically update their fields, sometimes you don't
-want the Collection query itself to be reactive also, as this just causes a
-double invalidation and destroys the old object. You may not want reactive
-queries for example if you want to maintain state on the object itself, and
-you don't want your reference to the object to be destroyed when the query
-invalidates. For example:
+You may want to use reactive or non-reactive queries depending on whether you
+want to maintain state on the object itself. Reactive queries have the
+advantage that your object data is always on the live-data. However, they have
+the disadvantage of destroying the reference to the old object, so it cannot
+maintain any sort of state. 
 
 Reactive Query
 ```
@@ -291,13 +313,17 @@ PostCollection.update({name: "My Cool Post", {
   {$set: {name: "My Very Cool Post"}}
 });
 
-Meteor.setTimeout(function() {
-  console.log(post.name);
-  >> "My Very Cool Post"
-  console.log(post.page);
-  >> undefined // reference to original object is lost
-}, 0);
+console.log(post.name);
+>> "My Very Cool Post"
+console.log(post.page);
+>> undefined // reference to original object is lost
 ```
+
+Non-Reactive queries allow you to hold onto a single reference of an object.
+You can do non-reactive queries just by passing `{reactive: false}`, or using
+the query outside a computation. This allows you to hold state on an object.
+If you need to both hold state, and ensure your data is always live, either
+repeatedly call `.refresh()`, or use `.poll()`.
 
 Non-Reactive Query
 ```
@@ -314,53 +340,13 @@ PostCollection.update({name: "My Cool Post", {
   {$set: {name: "My Very Cool Post"}}
 });
 
-Meteor.setTimeout(function() {
-  console.log(post.name);
-  >> "My Very Cool Post" // object is reactively updating still
-  console.log(post.page);
-  >> 2 // we still have the original object
-}, 0);
-```
-
-You can disable reactivity on queries by passing `{reactive: false}` to either
-the built in collection queries, or to the `.fetch()` and `.fetchOne()`
-methods provided by Reactive Class.
-
-Generally, you want to maintain reactivity on queries that are not returning a
-specific record and are liable to change (i.e, returning the record with the
-highest comment count), and you want to disable it when looking for a specific
-record (i.e. with a special id or name).
-
-```javascript
-// Queries not targetting specific records might want to retain reactivity
-post = PostCollection.findOne({commentCount : {$gte: 2}});
-post = Post.fetchOne({commentCount : {$gte: 2}});
-
-// Queries targetting specific records might not want reactivity
-post = Post.fetchOne({name: "My Cool Post"}, {reactive: false});
-post = PostCollection.findOne("YN2nZmczPsk3jvPuL");
-
-```
-
-Normally `.fetch()`, and `.fetchOne()` are reactive. However, if you pass a
-string into `.fetchOne()`, the method will run non-reactively. This is as the
-object is reactively updating its fields anyway, so the query running again
-would be redundant. For this reason, it is often better to use `.fetchOne()`
-when doing queries by _id.
-
-Unfortunately, a weakness of non-reactivite queries, is that when records are
-deleted in the database, their corresponding objects still evaluate to truthy
-objects. This is as javascript provides no way to programatically delete an
-object apart from destroying all references. Thus, we implement a `.exists()`
-function, that reactively lets you know if the object is still in the
-database. Note that this is only necessary if you are using non-reactive
-queries.
-
-```javascript
-post = Post.fetchOne("YN2nZmczPsk3jvPuL") // non-reactive
-Deps.autorun(function() {
-  console.log("Post Existence Status: " + post.exists());
-});
+console.log(post.name);
+>> "My Very Cool Post" // object is stale
+post.refresh()
+console.log(post.name);
+>> "My Very Very Cool Post" // object is now up to date
+console.log(post.page);
+>> 2 // we still have the original object
 ```
 
 #### Using set/get
@@ -380,32 +366,34 @@ post.set("name", "My cool post");
 ```
 
 #### Using Depend/Changed explicitly
-You can watch an object for change explicitly by calling depend on it
+You can watch an object for change explicitly by calling depend on it. Then,
+when the object changes via, `.set()`, `.poll()`, `.update()` or `.refresh()`,
+the computation will re-run. Note, that direct assignments will not invalidate
+the object, however, ou can use `.changed()` to invalidate it manually.
+
 ```javascript
 Deps.autorun(function() {
   post.depend();
 });
+post.name = "New Name";
 post.changed();
 ```
 
 #### Temporarily enabling/disabling reactivity
-And you can also temporarily lock or unlock the object
+Sometimes you don't want an object to reactively update for a period of time.
+This might be because, you are temporarily setting fields, and don't want them
+to get overwriten by a `.poll()` or `.refresh()`, or maybe you just want to
+limit UI redraws. To do this, just use `.lock()` to temporarily disable all
+invalidations of the object. When you a ready to reactivate reactivity, just
+call `.unlock()` which will cause an immediate invalidation of the object.
+
 ```javascript
 post.lock()
-post.unlock()
-```
-
-#### Turning off Reactivity
-If you don't want the objects reactively backed by Meteor Collections at all,
-just instantiate `ReactiveClass()` with a second parameter, `{reactive:
-false}`. This will improve performance, especially if you have a large number
-of objects. Turning off reactivity is also a good idea when all objects are
-instantiated by reactive queries anyway, as the objects are getting recreated
-everytime.
-
-```javascript
-PostCollection = new Meteor.Collection();
-Post = new ReactiveClass(PostCollection, {reactive: false});
+post.status = "Pending...";
+Meteor.call("Some long method", function() {
+  post.status = "Complete";
+  post.unlock();
+})
 ```
 
 ## Full Specification
@@ -461,4 +449,7 @@ Signature | Return | Explanation
 `.set(field, value)` | this | Sets a top level field of this object and invalidates computations tracking the object. Does not cause a mongoDB update.
 `.changed()` | this | Invalidates all computations tracking this object.
 `.depend()` | this | Makes the current computation reactively track this object.
+`.poll()` | computation | Tells an object to watch the database for updates. Returns a computation object, with a `.stop()` method to end the `.poll()`. Polling objects cannot be garbage collected.
+`.stopPoll()` | this | Tells an object to stop polling and allows it to be garbage collected again.
+`.`
 

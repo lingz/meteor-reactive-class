@@ -9,7 +9,7 @@ ReactiveClass = function(collection, opts) {
 
   // offline fields which we are not going to sync with mongoDB, and its clone
   // containing the mutable version
-  var default_offline_fields = ["_dep", "_reactive", "_exists", "_mongoTracker"];
+  var default_offline_fields = ["_dep", "_reactive", "_mongoTracker"];
   var offline_fields = Array.prototype.slice.call(default_offline_fields);
 
   var ReactiveClass = function(fields) {
@@ -37,18 +37,12 @@ ReactiveClass = function(collection, opts) {
   ReactiveClass.initialize = function () {
     this._dep = new Deps.Dependency();
     this._reactive = options.reactive;
-    this._exists = false;
-    this._mongoTracker = null;
   };
 
   // Takes a record returned from MongoDB and makes it into an instance of
   // this class. Also gives it reactivity if specified
   ReactiveClass._transformRecord = function(doc) {
     var object = new this(doc);
-    if (options.reactive) {
-      object._setupReactivity();
-    }
-    object._exists = true;
     return object;
   };
 
@@ -86,12 +80,7 @@ ReactiveClass = function(collection, opts) {
     var record;
     // we need to check if the argument passed in was a string, so we can make
     // it non reactive, as it means they are fetching a specific record by id.
-    if (arguments.length > 0 && typeof arguments.length[0] == "string")
-      record = Deps.nonreactive(function() {
-        record = collection.findOne.apply(collection, arguments);
-      });
-    else
-      record = collection.findOne.apply(collection, arguments);
+    record = collection.findOne.apply(collection, arguments);
 
     if (_.isEmpty(record))
       return undefined;
@@ -149,32 +138,6 @@ ReactiveClass = function(collection, opts) {
 
   // Instance methods
 
-  // Setup Reactivity - tells the object to start listening for changes to
-  // itself from the server, and if anything changes, it pulls them
-  // automatically.
-  ReactiveClass.prototype._setupReactivity = function(ignoreFirstTime) {
-    var firstTime = ignoreFirstTime ? true : false;
-    var self = this;
-    var newSelf;
-    this._mongoTracker = Deps.autorun(function(c) {
-      if (firstTime) {
-        firstTime = false;
-        return;
-      }
-      if (!self._reactive)
-        return;
-      newSelf = collection.findOne(self._id, {transform: null});
-      if (newSelf) {
-        _.extend(self, newSelf);
-      }
-      else {
-        self._exists = false;
-        self._mongoTracker = null;
-        c.stop();
-      }
-      self.changed();
-    });
-  };
 
   // Get sanitized version of object
   ReactiveClass.prototype.sanitize = function(keepId) {
@@ -185,8 +148,7 @@ ReactiveClass = function(collection, opts) {
 
   // Checks if there are any remaining data fields on this object.
   ReactiveClass.prototype.exists = function() {
-    this._dep.depend();
-    return this._exists;
+    return collection.findOne(this._id) !== undefined;
   };
 
   // can be optionally called with an update operator. Otherwise, it will just
@@ -227,11 +189,10 @@ ReactiveClass = function(collection, opts) {
   ReactiveClass.prototype.remove = function(callback) {
     var self = this;
     var removeCallback = function(error) {
-      if (error)
+      if (error) {
         throw error;
-      self._exists = false;
-      self._mongoTracker.stop();
-      self._mongoTracker = null;
+      }
+      self.changed();
     };
     if (callback) {
       removeCallback = function() {
@@ -251,14 +212,12 @@ ReactiveClass = function(collection, opts) {
     var insertCallback = function(error) {
       if (error)
         throw error;
-      self._setupReactivity();
-      self._exists = true;
     };
 
     if (originalCallback)
       callback = function() {
-        arguments[1]();
         insertCallback();
+        originalCallback();
       };
     else
       callback = insertCallback;
@@ -275,6 +234,7 @@ ReactiveClass = function(collection, opts) {
   // Turns on reactivity again, 
   ReactiveClass.prototype.unlock = function() {
     this._reactive = true;
+    this.changed();
     return this;
   };
 
@@ -286,11 +246,9 @@ ReactiveClass = function(collection, opts) {
         "Perhaps it was never inserted before."
       );
     var newFields = collection.findOne(this._id);
-    if (!newFields)
-      throw new Meteor.Error(500,
-        "Cannot refresh as no object with _id " +
-        this._id + " was found in the collection."
-      );
+    if (!newFields) {
+      return;
+    }
     _.extend(this, newFields);
     this.changed();
     return this;
@@ -305,14 +263,14 @@ ReactiveClass = function(collection, opts) {
   // Reactive setter
   ReactiveClass.prototype.set = function(field, value) {
     this[field] = value;
-    if (this._reactive)
-      this.changed();
+    this.changed();
     return this;
   };
 
   // Reactive function to indicate that the class has changed
   ReactiveClass.prototype.changed = function() {
-    this._dep.changed();
+    if (this._reactive)
+      this._dep.changed();
     return this;
   };
 
@@ -322,7 +280,37 @@ ReactiveClass = function(collection, opts) {
     return this;
   };
 
+  // Poll mongoDB for updates
+  ReactiveClass.prototype.poll = function() {
+    var self = this;
+    var newSelf;
+    this._mongoTracker = Deps.autorun(function(c) {
+      if (!self._reactive)
+        return;
+      newSelf = collection.findOne(self._id, {transform: null});
+      if (newSelf) {
+        _.extend(self, newSelf);
+      }
+      else {
+        self._exists = false;
+        self._mongoTracker = null;
+        c.stop();
+      }
+      self.changed();
+    });
+    return this._mongoTracker;
+  };
+
+  // Stops the polling and lets this object be cleaned up
+  ReactiveClass.prototype.stopPoll = function() {
+    if (this._mongoTracker) {
+      this._mongoTracker.stop();
+      this._mongoTracker = null;
+    }
+    return this;
+  };
 
   return ReactiveClass;
+
 };
 

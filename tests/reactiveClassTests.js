@@ -5,16 +5,16 @@ Tinytest.add("ReactiveClass - Instantiation", function(test) {
     return this.name;
   };
 
-  test.equal(Post.collection, PostCollection, "it took the right collection");
-  test.isTrue(typeof(Post.initialize) === "function", "it has static methods");
+  test.equal(Post.collection, PostCollection, "The class should have took the right collection");
+  test.isTrue(typeof(Post.initialize) === "function", "The class should have the right static context");
 
   var post = new Post({name: "My New Post"});
 
-  test.isTrue(typeof(post.instaceMethod) === "function", "it has its own prototype");
-  test.isTrue(typeof(post.update) === "function", "it has the ReactiveClass prototype");
-  test.isTrue(typeof(post.initialize) === "undefined", "it does not have static methods");
-  test.equal(post.name, "My New Post", "constructor properly took fields");
-  test.equal(post.name, post.instaceMethod(), "prototype methods have the right context");
+  test.isTrue(typeof(post.instaceMethod) === "function", "Instances should have their own prototype");
+  test.isTrue(typeof(post.update) === "function", "Instances should have the ReactiveClass prototype");
+  test.isTrue(typeof(post.initialize) === "undefined", "Instances should not have static methods");
+  test.equal(post.name, "My New Post", "Instances should properly construct with the right fields fields");
+  test.equal(post.name, post.instaceMethod(), "Instance methods should have the right context");
 });
 
 Tinytest.add("ReactiveClass - Inheritance", function(test) {
@@ -31,17 +31,17 @@ Tinytest.add("ReactiveClass - Inheritance", function(test) {
   Post.field = "field";
 
   var ReactivePost = ReactiveClass(PostCollection).extend(Post);
-  test.equal(ReactivePost.collection, PostCollection, "it took the right collection");
-  test.isTrue(typeof(ReactivePost.initialize) === "function", "it has ReactiveClass static methods");
-  test.isTrue(typeof(ReactivePost.staticMethod) === "function", "it has its own static methods");
-  test.equal(ReactivePost.field, Post.field, "all fields copied correctly");
-  test.equal(ReactivePost.field, ReactivePost.staticMethod(), "static context is correct");
+  test.equal(ReactivePost.collection, PostCollection, "The class should take the right collection");
+  test.isTrue(typeof(ReactivePost.initialize) === "function", "The class should have ReactiveClass static methods");
+  test.isTrue(typeof(ReactivePost.staticMethod) === "function", "The class should have its own static methods");
+  test.equal(ReactivePost.field, Post.field, "Static fields should have copied copied correctly");
+  test.equal(ReactivePost.field, ReactivePost.staticMethod(), "The static context should becorrect");
 
   var post = new ReactivePost({name: "My New Post"});
-  test.isTrue(typeof(post.instanceMethod) === "function", "it has its own prototype");
-  test.isTrue(typeof(post.update) === "function", "it has the ReactiveClass prototype");
-  test.isTrue(typeof(post.initialize) === "undefined", "it does not have static methods");
-  test.equal(post.name, post.instanceMethod(), "prototype methods have the right context");
+  test.isTrue(typeof(post.instanceMethod) === "function", "Instaces should have their own prototype");
+  test.isTrue(typeof(post.update) === "function", "Instances should have the ReactiveClass prototype");
+  test.isTrue(typeof(post.initialize) === "undefined", "Instaces should not have static methods");
+  test.equal(post.name, post.instanceMethod(), "Instance methods have the right context");
 
   PostWithComments = function (commentLimit) {
     this.commentLimit = commentLimit;
@@ -128,14 +128,52 @@ Tinytest.add("ReactiveClass - Updating objects on Mongo", function(test) {
   test.isTrue(post.name == "Very Very Cool Post", "The object should have the updated state");
   test.isTrue(PostCollection.findOne({name: "Very Very Cool Post"}), "Mongo should have the updated object");
 });
-
-Tinytest.add("ReactiveClass - Removing objects on Mongo", function(test) {
+Tinytest.addAsync("ReactiveClass - Polling objects on Mongo", function(test, next) {
   var PostCollection = new Meteor.Collection(null);
   var Post = new ReactiveClass(PostCollection);
-  var post = Post.create({name: "Cool Post"});
-  post.remove();
 
-  test.isTrue(PostCollection.find().count() === 0, "Mongo should no longer have the removed object");
+  var post = Post.create({name: "Cool Post"});
+  post.poll();
+
+  var lastName;
+  Deps.autorun(function() {
+    lastName = post.get("name");
+  });
+
+  test.isTrue(lastName == "Cool Post", "Dep should have already run once");
+
+  PostCollection.update(post._id, {
+    $set: {name: "Very Cool Post"}
+  });
+
+  Meteor.setTimeout(function() {
+    test.isTrue(lastName == "Very Cool Post", "Dep should have run again due to the DB update");
+    post.stopPoll();
+    PostCollection.update(post._id, {
+      $set: {name: "Very Very Cool Post"}
+    });
+    Meteor.setTimeout(function() {
+      test.isFalse(lastName == "Very Very Cool Post", "Dep should not have run again, as the polling has been stopped");
+      next();
+    }, 0);
+  }, 0);
+
+});
+
+Tinytest.addAsync("ReactiveClass - Removing objects on Mongo", function(test, next) {
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection);
+  var post = Post.create({name: "Cool Post"}, function() {
+    test.isTrue(post.exists(), "The object currently exists");
+    post.remove();
+
+    test.isTrue(PostCollection.find().count() === 0, "Mongo should no longer have the removed object");
+    test.isFalse(post.exists(), "The object should not still exist at this point");
+    Meteor.setTimeout(function() {
+      test.isFalse(post.exists(), "The object should not still exist");
+      next();
+    }, 0);
+  });
 });
 
 Tinytest.add("ReactiveClass - Refresh method", function(test) {
@@ -179,8 +217,6 @@ Tinytest.addAsync("ReactiveClass - Reactive Queries", function(test, next) {
   var Post = new ReactiveClass(PostCollection);
   Post.create({name: "My Cool Post", tag: 5});
   var post;
-  var first = true;
-  var compCounter = 0;
   Deps.autorun(function() {
     post = PostCollection.findOne({tag: 5});
   });
@@ -220,7 +256,7 @@ Tinytest.addAsync("ReactiveClass - Non-Reactive Queries", function(test, next) {
   });
   Meteor.setTimeout(function() {
     test.isTrue(post == oldPost, "The reactive query should not have overwritten our reference to the old object");
-    test.isTrue(post.name == "My Very Cool Post", "We should have the latest version of the post");
+    test.isFalse(post.name == "My Very Cool Post", "We should not have the latest version of the post");
     test.isTrue(post.page, "The state we attached to post should have remained");
     next();
   }, 0);
@@ -229,7 +265,7 @@ Tinytest.addAsync("ReactiveClass - Non-Reactive Queries", function(test, next) {
 Tinytest.addAsync("ReactiveClass - Setters and Getters", function(test, next) {
   var PostCollection = new Meteor.Collection(null);
   var Post = new ReactiveClass(PostCollection);
-  post = new Post({name: "My Cool Post"});
+  var post = new Post({name: "My Cool Post"});
 
   var count = 0;
   var finalVal;
@@ -256,7 +292,7 @@ Tinytest.addAsync("ReactiveClass - Setters and Getters", function(test, next) {
 Tinytest.addAsync("ReactiveClass - Depend and Changed", function(test, next) {
   var PostCollection = new Meteor.Collection(null);
   var Post = new ReactiveClass(PostCollection);
-  post = new Post({name: "My Cool Post"});
+  var post = new Post({name: "My Cool Post"});
 
   var count = 0;
   var finalVal;
@@ -278,7 +314,7 @@ Tinytest.addAsync("ReactiveClass - Depend and Changed", function(test, next) {
 Tinytest.addAsync("ReactiveClass - Locking and Unlocking", function(test, next) {
   var PostCollection = new Meteor.Collection(null);
   var Post = new ReactiveClass(PostCollection);
-  post = new Post({name: "My Cool Post"});
+  var post = new Post({name: "My Cool Post"});
 
   var count = 0;
   var finalVal;
@@ -300,25 +336,5 @@ Tinytest.addAsync("ReactiveClass - Locking and Unlocking", function(test, next) 
       test.isTrue(count == 2, "Deps should have run twice now that it has been unlocked");
       next();
     }, 0);
-  }, 0);
-});
-
-Tinytest.addAsync("ReactiveClass - Turning Off Reactivity", function(test, next) {
-  var PostCollection = new Meteor.Collection(null);
-  var Post = new ReactiveClass(PostCollection, {reactive: false});
-
-  var post = Post.create({name: "Cool Post"});
-
-  PostCollection.update(post._id, {
-    $set: {name: "Very Very Cool Post"}
-  });
-
-  Meteor.setTimeout(function() {
-    test.isFalse(post.name == "Very Very Cool Post", "The object should not update reactively when reactivity is off");
-    test.isTrue(PostCollection.findOne({name: "Very Very Cool Post"}), "Mongo should have the updated object");
-
-    post.refresh();
-    test.isTrue(post.name == "Very Very Cool Post", "The object should still be able to update through manual refresh");
-    next();
   }, 0);
 });

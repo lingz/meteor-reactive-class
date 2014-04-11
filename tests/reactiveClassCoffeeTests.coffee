@@ -6,19 +6,14 @@ Tinytest.add "ReactiveClass - Coffee Instantiation", (test) ->
       Post.initialize.call(@)
     getName: () ->
       this.name
-  # it took the right collection
-  test.equal(Post.collection, PostCollection)
-  # it has static methods
-  test.isTrue(typeof(Post.initialize) == "function")
+  test.equal(Post.collection, PostCollection, "The class should have the right collection")
+  test.isTrue(typeof(Post.initialize) == "function", "The class should have the right static context")
 
   post = new Post()
-  # it has its own prototype
-  test.isTrue(typeof(post.getName) == "function")
-  # inherited ReactiveClass prototype
-  test.isTrue(typeof(post.update) == "function")
-  # it does not have static methods
-  test.isTrue(typeof(post.initialize) == "undefined")
-  test.isTrue(post._reactive, "This is good instantiation")
+  test.isTrue(typeof(post.getName) == "function", "Instances should have its own prototype")
+  test.isTrue(typeof(post.update) == "function", "Instances should have inherited the Reactive Class prototype")
+  test.isTrue(typeof(post.initialize) == "undefined", "Instances should not have the static context")
+  test.isTrue(post instanceof Post, "Instances should be of the right class")
 
   class BadPost extends ReactiveClass(PostCollection)
     constructor: () ->
@@ -27,5 +22,5 @@ Tinytest.add "ReactiveClass - Coffee Instantiation", (test) ->
       this.name
 
   post = new BadPost()
-  test.isFalse(post._reactive, "This is bad instantiation")
+  test.isFalse(post._reactive, "Without calling initialize should give a bad class")
 
