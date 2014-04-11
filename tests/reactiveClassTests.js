@@ -92,7 +92,20 @@ Tinytest.add("ReactiveClass - Fetching from Database", function(test) {
 
   var post = Post.fetchOne(postId);
   test.isTrue(post, "Should be able to fetch by Id");
+  test.isTrue(post instanceof Post, "Id query should be fetch");
 
   var queriedPost = Post.fetchOne({name: "My Cool Post"});
   test.isTrue(queriedPost, "Should be also able to fetch by query");
+
+});
+
+Tinytest.add("ReactiveClass - Creating an object for Mongo", function(test) {
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection);
+
+  var newPost = Post.create({name: "New Post"});
+
+  test.isTrue(_.has(newPost, "_id", "name"), "The created object should have its own fields and an _id");
+  test.isTrue(PostCollection.findOne({name: "New Post"}), "The created object should have a record in mongo."); 
+
 });

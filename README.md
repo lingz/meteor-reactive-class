@@ -143,7 +143,7 @@ class Post extends ReactiveClass(PostCollection)
     return this.name
 ```
 
-## Instantiating Objects
+## Interacting With Mongo
 
 #### Client instantiation
 Objects can be created on the client and not linked to any object in the
@@ -163,8 +163,7 @@ post.put(function() {
 >> true
 ```
 
-
-## Transformations
+#### Fetching objects
 Once you've assigned a collection to a class, objects of this class
 automatically get cast into that class. You can turn this off by passing
 `{transformCollection: false}` to `ReactiveClass(collection, options)`. Note
@@ -178,30 +177,20 @@ These have identical signatures to Meteor's `.find()` and `.findOne()` except
 they always transform the results into instances of your class, and they
 return objects instead of cursors always.
 
+With Transform:
 ```javascript
-post = Post.fetchOne({commentCount: {$gte: 2}});
-posts = Post.fetch({commentsCount: {"$gte": 2}});
+var PostCollection = new Meteor.Collection(null);
+var Post = new ReactiveClass(PostCollection);
+post = PostCollection.fetchOne({commentCount: {$gte: 2}});
+posts = PostCollection.fetch({commentsCount: {"$gte": 2}});
 ```
 
-## Interacting With Mongo
-
-#### Taking a local object and putting it into the DB
-Use `.put(callback)` to take an object that only exists locally and put it online.
-Note that database inserts are asynchronous on the client. Use `.exists()` to
-check if the record was successfully inserted. Nevertheless, it will appear as
-though the object was inserted instantly, due to Meteor's latency
-compensation.
-
+Without Transform:
 ```javascript
-post1 = new Post({name: "My Cool Post"});
-console.log(PostCollection.findOne({name: "My Cool Post")};
->> undefined
-
-post1.put(function() {
-  console.log("Post database status: " + post1.exists())
-});
-console.log(PostCollection.findOne({name: "My Cool Post")};
->> {_id: "YN2nZmczPsk3jvPuL", name: "My Cool Post"}
+var PostCollection = new Meteor.Collection(null);
+var Post = new ReactiveClass(PostCollection, {transformCollection: false});
+post = Post.fetchOne({commentCount: {$gte: 2}});
+posts = Post.fetch({commentsCount: {"$gte": 2}});
 ```
 
 #### Creating an object for the DB
@@ -213,7 +202,7 @@ acknowledgement from the server that the record successfully inserted. Use
 `.exists()` to check if it exists in the database.
 
 ```javascript
-var newPost = PostCollection.create({name: "New Post"});
+var newPost = Post.create({name: "New Post"});
 PostCollection.findOne({name: "New Post"}); 
 >> {_id: "YN2nZmczPsk3jvPuL", name: "New Post"}
 ```
@@ -238,7 +227,8 @@ console.log(post)
 
 #### Forcing a refresh
 You can also force Mongo to fetch the latest version of a document with
-`.refresh()`.
+`.refresh()`. This is useful if you have reactivity off or locked down with
+`.lock()`.
 ```javascript
 post.refresh();
 ```
