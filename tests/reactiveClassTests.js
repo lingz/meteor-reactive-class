@@ -253,6 +253,28 @@ Tinytest.addAsync("ReactiveClass - Setters and Getters", function(test, next) {
   }, 0);
 });
 
+Tinytest.addAsync("ReactiveClass - Depend and Changed", function(test, next) {
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection);
+  post = new Post({name: "My Cool Post"});
+
+  var count = 0;
+  var finalVal;
+  Deps.autorun(function() {
+    finalVal = post.name;
+    post.depend();
+    count++;
+  });
+
+  post.name = "My Very Cool Post";
+  post.changed();
+  Meteor.setTimeout(function() {
+    test.isTrue(finalVal == "My Very Cool Post", "Deps should keep finalVal up to date");
+    test.isTrue(count == 2, "Deps should run again when invalidated");
+    next();
+  }, 0);
+});
+
 Tinytest.addAsync("ReactiveClass - Locking and Unlocking", function(test, next) {
   var PostCollection = new Meteor.Collection(null);
   var Post = new ReactiveClass(PostCollection);
@@ -280,3 +302,5 @@ Tinytest.addAsync("ReactiveClass - Locking and Unlocking", function(test, next) 
     }, 0);
   }, 0);
 });
+
+
