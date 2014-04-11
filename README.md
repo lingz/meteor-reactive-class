@@ -2,8 +2,8 @@
 
 Reactive classes with data backed by Meteor collections! Allows for simple two
 way data binding, as well as for Object Oriented Programming without losing
-any of the benefits of reactive Meteor collections. Objects are _not
-reinstantiated_ when syncing with the corresponding collection record updates
+any of the benefits of reactive Meteor collections. Objects are **not
+reinstantiated** when syncing with the corresponding collection record updates
 and therefore can maintain state.
 
 It also acts as a database wrapper over MongoDB and allows for simply managing
@@ -149,21 +149,20 @@ class Post extends ReactiveClass(PostCollection)
 
 ## Interacting With Mongo
 
-#### Client instantiation
+### Client instantiation
 Objects can be created on the client and not linked to any object in the
 collection. When ready to insert it into the collection, just call `.put()`.
 You can use `.exists()` to reactively check if an object is in the MongoDB
 record. Note that on the client all database operations appear synchronous due
 to latency compensation but in fact need to asynchronously validate all
-operations with the server. `.exists()` only changes after this process is
-complete.
+operations with the server. 
 
 ```javascript
 post = new Post({name: "My Cool Post"});
 post.put()
 ```
 
-#### Fetching objects
+### Fetching objects
 Once you've assigned a collection to a class, objects of this class
 automatically get cast into that class. You can turn this off by passing
 `{transformCollection: false}` to `ReactiveClass(collection, options)`. Note
@@ -193,13 +192,12 @@ post = Post.fetchOne({commentCount: {$gte: 2}});
 posts = Post.fetch({commentsCount: {"$gte": 2}});
 ```
 
-#### Creating an object for the DB
+### Creating an object for the DB
 Use `.create(callback)` which has the same signature as `.insert()` to
 instantiate a new object and put it into the database straight away, in one
 step. This has the same asynchronosity behavior as `.put()`, where it will
-appear to complete instantly but is in fact asnychronous until it receives
-acknowledgement from the server that the record successfully inserted. Use
-`.exists()` to check if it exists in the database.
+appear to complete instantly but might fail when validating against the server
+Use `.exists()` to reactively check if it exists in the database.
 
 ```javascript
 var newPost = Post.create({name: "New Post"});
@@ -207,13 +205,14 @@ PostCollection.findOne({name: "New Post"});
 >> {_id: "YN2nZmczPsk3jvPuL", name: "New Post"}
 ```
 
-#### Keeping in sync with MongoDB
+### Keeping in sync with MongoDB
 Call `update()` to update MongoDB with all current fields. You can also use
 `update(query)` to make an update query with the current object. The object
 will automatically reflect the updated state it should have after the update
 query. Use `.refresh()` to pull all the latest fields from MongoDB and update
 the local object.
 
+#### Manual refresh
 ```javascript
 post = new Post.create({name: "Cool Post"});
 post.name = "Very Cool Post";
@@ -231,14 +230,18 @@ console.log(post);
 ```
 
 The other option is to use `.poll()`, where the object will listen for changes
-from the DB. Use with care and only if you really need it. When an object is
-polling, it _cannot be garbage collected_, and if you are programmatically
-polling a large number of objects, you may cause memory leaks. Thus, you must
-ensure that you stop all polling before you lose references to an object. The
-`.poll()` method returns a computation object. To stop the polling, either
-call `.stop()` on this computation object, or call `object.stopPoll()`. This
-allows the object to get garbage collected again.
+from the DB. 
 
+**Warning:** Use with care and only if you know what you're doing. When an
+object is polling, it **cannot be garbage collected**.
+
+If you are programmatically polling a large number of objects, you may cause
+memory leaks. Thus, you must ensure that you stop all polling before you lose
+references to an object. The `.poll()` method returns a computation object. To
+stop the polling, either call `.stop()` on this computation object, or call
+`object.stopPoll()`. This allows the object to get garbage collected again.
+
+#### Polling Refresh
 ```javascript
 post = new Post.create({name: "Cool Post"});
 var computation = post.poll();
@@ -262,7 +265,7 @@ computation.stop();
 post.stopPoll();
 ```
 
-#### Removing an object
+### Removing an object
 You can make an object remove its corresponding record with
 `.remove(callback)`. Again, we have the same behavior as was described with
 `.put()`, where it will appear to work instantly, but needs to asynchronously
@@ -275,7 +278,7 @@ console.log(post.exists());
 >> false
 ```
 
-#### Adding / Removing offline fields
+### Adding / Removing offline fields
 Sometimes you want your object to hold fields that do not get put into mongo.
 ```javascript
 Post.addOfflineField(["currentComment", "currentPage"]);
@@ -293,14 +296,14 @@ console.log(post);
 
 ## Reactivity
 
-#### Reactive Queries
+### Reactive Queries
 You may want to use reactive or non-reactive queries depending on whether you
 want to maintain state on the object itself. Reactive queries have the
 advantage that your object data is always on the live-data. However, they have
 the disadvantage of destroying the reference to the old object, so it cannot
 maintain any sort of state. 
 
-##### Reactive Query
+#### Reactive Query
 ```javascript
 var post;
 Deps.autorun(function() {
@@ -327,7 +330,7 @@ the query outside a computation. This allows you to hold state on an object.
 If you need to both hold state, and ensure your data is always live, either
 repeatedly call `.refresh()`, or use `.poll()`.
 
-##### Non-Reactive Query
+#### Non-Reactive Query
 ```javascript
 var post;
 Deps.autorun(function() {
@@ -351,11 +354,12 @@ console.log(post.page);
 >> 2 // we still have the original object
 ```
 
-#### Using set/get
+### Using set/get
 You can use setters and getters to make your access / modifications straight
-away. Essentially, this treats every field as if it was a small Session
-variable. Sets are *not* reflected on MongoDB, and it is required you call
-`.update()` after if you want the changes to reflect there.
+away. Essentially, this treats the entire object as if it was a `Session`
+variable. `.set()` operations are **not** reflected on MongoDB, and it is
+required you call `.update()` after if you want the changes to carry over to
+mongoDB.
 
 ```javascript
 post = Post.create({name: "My Post"})
@@ -367,7 +371,7 @@ post.set("name", "My cool post");
 >> {_id: "YN2nZmczPsk3jvPuL", name: "My cool post"}
 ```
 
-#### Using Depend/Changed explicitly
+### Using Depend/Changed explicitly
 You can watch an object for change explicitly by calling depend on it. Then,
 when the object changes via, `.set()`, `.poll()`, `.update()` or `.refresh()`,
 the computation will re-run. Note, that direct assignments will not invalidate
@@ -381,7 +385,7 @@ post.name = "New Name";
 post.changed();
 ```
 
-#### Temporarily enabling/disabling reactivity
+### Locking to enable/disable reactivity
 Sometimes you don't want an object to reactively update for a period of time.
 This might be because, you are temporarily setting fields, and don't want them
 to get overwriten by a `.poll()` or `.refresh()`, or maybe you just want to
@@ -403,13 +407,13 @@ Meteor.call("Some long method", function() {
 Listed here are all the static and instance methods provided through
 ReactiveClass.
 
-_Beware of Namespace conflicts_. Your Mongo object cannot have the same name
+**Beware of Namespace conflicts**. Your Mongo object cannot have the same name
 as one of the instance methods, or you will overwrite it. If you have a
 namespace conflict on your object field that cannot be changed, open an issue.
-If this is a common problem, it might add a prefix option, to change the names
+If this is a common problem, I might add a prefix option, to change the names
 of some methods. However, as it stands, the current terseness is nice.
 
-#### Static Methods
+### Static Methods
 Static methods are called as such:
 ```javascript
 Post = new ReactiveClass(PostCollection);
@@ -430,7 +434,7 @@ Signature | Return | Explanation
 `.removeOfflineFields(toRemoveOfflineFields)` | undefined | Inverse operation of `.addOfflineFields()`
 `.extend(childClass)` | new Class | Creates a new class, which double inherits from both the specified child class, and the current Reactive Class.
 
-#### Instace Methods
+### Instace Methods
 Instance methods are called like this
 ```javascript
 var post = new Post({name: "My Cool Post"});
