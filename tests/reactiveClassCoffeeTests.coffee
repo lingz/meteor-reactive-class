@@ -3,7 +3,6 @@ Tinytest.add "ReactiveClass - Coffee Instantiation", (test) ->
   class Post extends ReactiveClass(PostCollection)
     constructor: () ->
       this.good = true
-      console.log(Post)
       Post.initialize.call(@)
     getName: () ->
       this.name

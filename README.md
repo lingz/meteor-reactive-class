@@ -10,24 +10,23 @@ the corresponding collection record updates and therefore can maintain state.
 
 It also acts as a database wrapper over MongoDB and allows for simply
 changing fields in a natural way and calling `.update()` to reflect those
-changes on the DB.
+changes on the DB. Utilizes 
 
 [![Build Status](https://travis-ci.org/lingz/meteor-reactive-class.svg)](https://travis-ci.org/lingz/meteor-reactive-class)
 
 ## Example
 
-Simple setup, with natural javascript prototype based classes.
+Simple setup, with natural javascript prototype based classes. Integrate it
+into your existing codebase without refactoring using Meteor Collection
+transforms. By default, it will automatically cast all objects returned by the
+queries as objects of your defined class.
+
 ```javascript
 PostCollection = new Meteor.Collection();
 Post = new ReactiveClass(PostCollection);
 Post.prototype.getName = function() {
   return this.name();
 }
-```
-
-Integrate it into your existing codebase without refactoring.
-```javascript
-PostCollection._transform = Post.transform;
 ```
 
 Easily create a local object and put it into the DB.
@@ -65,6 +64,24 @@ PostCollection.update({name: "My Cool Post"},
 console.log(post.name); // My Very Cool Post
 ```
 
+## Options
+
+You can pass these into the ReactiveClass constructor.
+
+```javascript
+Post = new ReactiveClass(PostCollection, {
+  reactive: true,
+  transformCollection: true
+});
+```
+
+Here are the options:
+
+Field               | Default   | Explanation
+---------------------------------
+reactive            | true      | Whether objects reactively update with the collection.
+transformCollection | true      | Whether collection queries automatically return objects cast into this class. Set to false if you are using the same collection for multiple classes.
+
 ## Setup
 
 ### Simple Class
@@ -77,21 +94,6 @@ Post = new ReactiveClass(PostCollection);
 Post.prototype.getName = function() {
   return this.name;
 }
-```
-
-### Transform method
-If you have a very significant existing codebase, and want a way to cheaply
-get Reactive Classes everywhere without any refactoring, you can use the
-transform field on Meteor collections to make all queries return instances of
-your Reactive Class. (Warning: untested).
-
-```javascript
-PostCollection = new Meteor.Collection();
-Post = new ReactiveClass(PostCollection);
-Post.prototype.getName = function() {
-  return this.name;
-}
-PostCollection._transform = Post.transform;
 ```
 
 ### Inheritance
@@ -136,6 +138,14 @@ class Post extends ReactiveClass(PostCollection)
   getName: () ->
     return this.name
 ```
+
+### Note on transformation
+Once you've assigned a collection to a class, objects of this class
+automatically get cast into that class. You can turn this off by passing
+`{transformCollection: false}` to `ReactiveClass(collection, options)`. Note
+that if you are using the same collection for multiple classes, it is highly
+recommended that you set it to false on every instance, or all your objects
+will be of the type of the last class you defined.
 
 ## Instantiating Objects
 

@@ -1,6 +1,7 @@
-ReactiveClass = function(collection, opts, string) {
+ReactiveClass = function(collection, opts) {
   var defaultOpts = {
-    reactive: true
+    reactive: true,
+    transformCollection: true
   };
   var options = _.extend(defaultOpts, opts);
 
@@ -9,18 +10,10 @@ ReactiveClass = function(collection, opts, string) {
   var default_offline_fields = ["_dep", "_reactive"];
   var offline_fields = Array.prototype.slice.call(default_offline_fields);
 
-
   var ReactiveClass = function(fields) {
     _.extend(this, fields);
     ReactiveClass.initialize.call(this);
   };
-
-  // decoupling the initializer from the ReactiveClass constructor
-  ReactiveClass.initialize = function () {
-    this._dep = new Deps.Dependency();
-    this._reactive = options.reactive;
-  };
-
 
   if (!collection || !(collection instanceof Meteor.Collection))
     throw new Meteor.Error(500,
@@ -29,23 +22,27 @@ ReactiveClass = function(collection, opts, string) {
 
   ReactiveClass.collection = collection;
 
-  // function compatible with Meteor's transformer that takes a MongoDB record
-  // and makes it into a self updating version of the class
-  ReactiveClass.transform = function(doc) {
-    var firstTime = true;
+  // Let Collection queries automatically return instances of this class
+  var setupTransform = function() {
+    collection._transform = function(doc) {
+      return ReactiveClass._transformRecord(doc);
+    };
+  };
+  if (options.transformCollection)
+    setupTransform();
+
+  // decoupling the initializer from the ReactiveClass constructor
+  ReactiveClass.initialize = function () {
+    this._dep = new Deps.Dependency();
+    this._reactive = options.reactive;
+  };
+
+  // Takes a record returned from MongoDB and makes it into an instance of
+  // this class. Also gives it reactivity if specified
+  ReactiveClass._transformRecord = function(doc) {
     var object = new this(doc);
     if (options.reactive)
-      Deps.autorun(function() {
-        // don't update again the first time
-        if (firstTime) {
-          firstTime = false;
-          return;
-        }
-        // don't update if the object is not reactive
-        if (!object._reactive)
-          return;
-        _.extend(object, collection.findOne(this._id));
-      });
+      object._setupReactivity();
     return object;
   };
 
@@ -55,45 +52,85 @@ ReactiveClass = function(collection, opts, string) {
     return this.fetchOne(id);
   };
 
-  ReactiveClass.fetchOne = function(query, opts) {
-    var record;
-    if (opts && opts.reactive)
-      record = collection.findOne(query);
-    else
-      record = Deps.nonreactive(function() {
-        return collection.findOne(query);
-      });
-    if (_.isEmpty(record))
-      return undefined;
-    return this.transform(record);
+  // set the options based on some defaults. This sets it potentially, as the
+  // object passed in might not actually be an options object, so we need to
+  // first check that. This mutates the options object passed in, and returns
+  // a boolean dictating whether the options object was foudn or not.
+  var setOptions = function(defaultOptions, possibleOptions) {
+    var hasOptions = false;
+    for (var key in possibleOptions) {
+      if (_.has(defaultOptions, key)) {
+        hasOptions = true;
+        break;
+      }
+    }
+    if (hasOptions)
+      _.extend(defaultOptions, possibleOptions);
+    return hasOptions;
   };
 
-  // reactively fetch an array of objects
-  ReactiveClass.fetch = function(query, opts) {
-    var args, opts;
-    var opts = arguments[arguments.length - 1]; 
-    if (lastArg && lastArg.reactive) {
+  ReactiveClass.fetchOne = function() {
+    var record, args, hasOptions = false;
+    var local_options = {
+      reactive: true
+    };
+    if (arguments.length > 0)
+      hasOptions = setOptions(options, arguments[arguments.length - 1]); 
+
+    if (hasOptions) {
       args = Array.prototype.slice.call(arguments, 0, arguments.length - 1);
     } else {
       args = Array.prototype.slice.call(arguments);
     }
+
+    if (local_options.reactive)
+      record = collection.findOne.apply(collection, args);
+    else
+      record = Deps.nonreactive(function() {
+        return collection.findOne.apply(collection, args);
+      });
+    if (_.isEmpty(record))
+      return undefined;
+    if (!options.transformCollection)
+      record = this._transformRecord(record);
+    return record;
+  };
+
+  // reactively fetch an array of objects
+  ReactiveClass.fetch = function() {
+    var args, hasOptions = false;
+    var local_options = {
+      reactive: true
+    };
+    if (arguments.length > 0)
+      hasOptions = setOptions(options, arguments[arguments.length - 1]); 
+
+    if (hasOptions) {
+      args = Array.prototype.slice.call(arguments, 0, arguments.length - 1);
+    } else {
+      args = Array.prototype.slice.call(arguments);
+    }
+
     var objects = [];
     // when this reactively reruns, it will delete all objects of the array
     // and create them fresh
     var queryResults;
-    if (opts && opts.reactive) {
-      queryResults = collection.find.apply(args).fetch();
+    if (options.reactive) {
+      queryResults = collection.find.apply(apply, args).fetch();
     } else {
       Deps.nonreactive(function() {
-        queryResults = collection.find.apply(args).fetch();
+        queryResults = collection.find.apply(apply, args).fetch();
       });
     }
-    for (var i = 0, length = queryResults.length; i++; i < queryResultsLength) {
-      // for each of the objects in the list, creative a reactively updating
-      // object and insert it into the ith position of the array
-      var localObject = new this.transform(queryResults[i]);
-      objects[i] = localObject;
-    }
+
+    // for each of the objects in the list, creative a reactively updating
+    // object and insert it into the ith position of the array, only if we
+    // aren't already transforming.
+    var self = this;
+    if (!options.transformCollection)
+      _.map(queryResults, function(record) {
+        self._transformRecord(record);
+      });
     return objects;
   };
 
@@ -116,6 +153,23 @@ ReactiveClass = function(collection, opts, string) {
 
 
   // Instance methods
+
+  // Setup Reactivity - tells the object to start listening for changes to
+  // itself from the server, and if anything changes, it pulls them
+  // automatically.
+  ReactiveClass.prototype._setupReactivity = function() {
+    var firstTime = true;
+    var self = this;
+    Deps.autorun(function() {
+      if (!self._reactive)
+        return;
+      if (firstTime) {
+        firstTime = false;
+        return;
+      }
+      _.extend(self, collection.findOne(self._id));
+    });
+  }
 
   // Get sanitized version of object
   ReactiveClass.prototype.sanitize = function(keepId) {
@@ -157,19 +211,10 @@ ReactiveClass = function(collection, opts, string) {
 
   // Inserts an entry into a database for the first time
   ReactiveClass.prototype.put = function() {
-    var firstTime = true;
     var id = collection.insert(this.sanitize(true));
     this._id = id;
     if (options.reactive)
-      Deps.autorun(function() {
-        if (firstTime) {
-          firstTime = false;
-          return;
-        }
-        if (!this._reactive)
-          return;
-        _.extend(this, collection.findOne(this._id));
-      });
+      this._setupReactivity();
     return this;
   };
 
@@ -247,8 +292,6 @@ ReactiveClass = function(collection, opts, string) {
       _.extend(constructor, childClass);
       _.extend(constructor, this);
       constructor.prototype = new dummyClass();
-      console.log("FINAL CONSTRUCTOR");
-      console.log(constructor);
     }
     return constructor;
   };
