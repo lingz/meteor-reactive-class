@@ -125,8 +125,28 @@ Tinytest.add("ReactiveClass - Updating objects on Mongo", function(test) {
     $set: {name: "Very Very Cool Post"}
   });
 
-  console.log(post);
   test.isTrue(post.name == "Very Very Cool Post", "The object should have the updated state");
   test.isTrue(PostCollection.findOne({name: "Very Very Cool Post"}), "Mongo should have the updated object");
 });
 
+Tinytest.add("ReactiveClass - Removing objects on Mongo", function(test) {
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection);
+  post = Post.create({name: "Cool Post"});
+  post.remove();
+
+  test.isTrue(PostCollection.find().count() === 0, "Mongo should no longer have the removed object");
+});
+
+Tinytest.add("ReactiveClass - Refresh method", function(test) {
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection, {reactive: false});
+  post = Post.create({name: "Cool Post"});
+
+  post.update({
+    $set: {name: "Very Cool Post"}
+  });
+  post.refresh();
+
+  test.isTrue(post.name == "Very Cool Post", "An update should make the object be consistent with the database");
+});
