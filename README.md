@@ -2,15 +2,16 @@
 
 Reactive classes with data reactively backed by Meteor collections! Allows the
 attachment of arbitary methods or fields through prototype based classes.
-Allows for simple, object oriented two way data binding, as well as for OOP
-without losing any of the benefits of reactive Meteor collectoins.  Objects
-automatically update their fields whenever minimongo reactively reports that
-their corresponding entry has changed. Objects are *not reinstantiated* when
-the corresponding collection record updates and therefore can maintain state.
+Allows for simple two way data binding, as well as for Object Oriented
+Programming without losing any of the benefits of reactive Meteor collections.
+Objects automatically update their fields whenever minimongo reactively
+reports that their corresponding entry has changed. Objects are _not
+reinstantiated_ when the corresponding collection record updates and therefore
+can maintain state.
 
-It also acts as a database wrapper over MongoDB and allows for simply
-changing fields in a natural way and calling `.update()` to reflect those
-changes on the DB. Utilizes 
+It also acts as a database wrapper over MongoDB and allows for simply changing
+fields in a natural way and calling `.update()` to reflect those changes on
+the DB. Utilizes 
 
 [![Build Status](https://travis-ci.org/lingz/meteor-reactive-class.svg)](https://travis-ci.org/lingz/meteor-reactive-class)
 
@@ -63,8 +64,8 @@ PostCollection.update({name: "My Cool Post"},
     "$set": {name: "My Very Cool Post"}
   }
 ); 
+Meteor.setTimeout(function() {console.log(post.name);}, 0); 
 >> Name changed, it is now: My Very Cool Post // Invalidated autorun
-console.log(post.name); 
 >> My Very Cool Post // local object got updated also
 ```
 
@@ -254,13 +255,15 @@ Sometimes you want your object to hold fields that do not get put into mongo.
 ```javascript
 Post.addOfflineField(["currentComment", "currentPage"]);
 Post.removeOfflineField(["currentPage"]);
-post = Post.create({name: "Cool Post"});
-post.currentPage = 2;
+post = Post.create({name: "Cool Post", currentPage: 2});
+
 post.currentComment = 3;
 post.update();
+
 console.log(PostCollection.findOne({name: "Cool Post"}));
-// {_id: "YN2nZmczPsk3jvPuL", name: "Cool Post", }
+>> {_id: "YN2nZmczPsk3jvPuL", name: "Cool Post"}
 console.log(post);
+>> {_id: "YN2nZmczPsk3jvPuL", name: "Cool Post", currentPage: 2, currentComment: 3 }
 ```
 
 ## Reactivity
@@ -288,10 +291,12 @@ PostCollection.update({name: "My Cool Post", {
   {$set: {name: "My Very Cool Post"}}
 });
 
-console.log(post.name);
->> "My Very Cool Post"
-console.log(post.page);
->> undefined // reference to original object is lost
+Meteor.setTimeout(function() {
+  console.log(post.name);
+  >> "My Very Cool Post"
+  console.log(post.page);
+  >> undefined // reference to original object is lost
+}, 0);
 ```
 
 Non-Reactive Query
@@ -309,10 +314,12 @@ PostCollection.update({name: "My Cool Post", {
   {$set: {name: "My Very Cool Post"}}
 });
 
-console.log(post.name);
->> "My Very Cool Post" // object is reactively updating still
-console.log(post.page);
->> 2 // we still have the original object
+Meteor.setTimeout(function() {
+  console.log(post.name);
+  >> "My Very Cool Post" // object is reactively updating still
+  console.log(post.page);
+  >> 2 // we still have the original object
+}, 0);
 ```
 
 You can disable reactivity on queries by passing `{reactive: false}` to either
@@ -405,7 +412,7 @@ Post = new ReactiveClass(PostCollection, {reactive: false});
 Listed here are all the static and instance methods provided through
 ReactiveClass.
 
-*Beware of Namespace conflicts*. Your Mongo object cannot have the same name
+_Beware of Namespace conflicts_. Your Mongo object cannot have the same name
 as one of the instance methods, or you will overwrite it. If you have a
 namespace conflict on your object field that cannot be changed, open an issue.
 If this is a common problem, it might add a prefix option, to change the names

@@ -1,6 +1,6 @@
 {
   "name": "reactive-class",
-  "description": "Reactive Classes backed by Meteor Collections.",
+  "description": "Reactive Classes backed by Meteor Collections with two-way data binding.",
   "homepage": "https://github.com/lingz/meteor-reactive-class",
   "author": "Lingliang Zhang (https://github.com/lingz)",
   "version": "0.1.0",
