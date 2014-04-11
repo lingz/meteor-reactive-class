@@ -1,4 +1,4 @@
-#Reactive Class for Meteor
+# Reactive Class for Meteor
 
 Reactive classes with data backed by Meteor collections! Allows for simple two
 way data binding, as well as for Object Oriented Programming without losing
@@ -13,6 +13,11 @@ object! Alternatively, use the polling mode, and have the objects listen for
 mongoDB updates, and update themselves reactively.
 
 [![Build Status](https://travis-ci.org/lingz/meteor-reactive-class.svg)](https://travis-ci.org/lingz/meteor-reactive-class)
+
+## Install
+
+1. Install [Meteorite](https://github.com/oortcloud/meteorite/)
+2. `mrt add reactive-class`
 
 ## Example
 
@@ -155,8 +160,6 @@ complete.
 
 ```javascript
 post = new Post({name: "My Cool Post"});
-console.log(post.exists());
->> false
 post.put()
 ```
 
@@ -178,8 +181,8 @@ With Transform:
 ```javascript
 var PostCollection = new Meteor.Collection(null);
 var Post = new ReactiveClass(PostCollection);
-post = PostCollection.fetchOne({commentCount: {$gte: 2}});
-posts = PostCollection.fetch({commentsCount: {"$gte": 2}});
+post = PostCollection.findOne({commentCount: {$gte: 2}});
+posts = PostCollection.find({commentsCount: {"$gte": 2}});
 ```
 
 Without Transform:
@@ -215,6 +218,7 @@ the local object.
 post = new Post.create({name: "Cool Post"});
 post.name = "Very Cool Post";
 post.update();
+
 PostCollection.findOne({name: "Very Cool Post"});
 >> {_id: "YN2nZmczPsk3jvPuL", name: "Very Cool Post"}
 
@@ -265,12 +269,10 @@ You can make an object remove its corresponding record with
 validate the remove with the server. Again use `.exists()` to check if it is
 still in the database.
 
-```
-post.remove(function() {
-  console.log("Post existence status": post.exists());
-};
+```javascript
+post.remove();
 console.log(post.exists());
->> true // note that the remove function is asnychronous on the client.
+>> false
 ```
 
 #### Adding / Removing offline fields
@@ -298,8 +300,8 @@ advantage that your object data is always on the live-data. However, they have
 the disadvantage of destroying the reference to the old object, so it cannot
 maintain any sort of state. 
 
-Reactive Query
-```
+##### Reactive Query
+```javascript
 var post;
 Deps.autorun(function() {
   post = PostCollection.findOne("YN2nZmczPsk3jvPuL")
@@ -325,8 +327,8 @@ the query outside a computation. This allows you to hold state on an object.
 If you need to both hold state, and ensure your data is always live, either
 repeatedly call `.refresh()`, or use `.poll()`.
 
-Non-Reactive Query
-```
+##### Non-Reactive Query
+```javascript
 var post;
 Deps.autorun(function() {
   post = PostCollection.findOne("YN2nZmczPsk3jvPuL", {reactive: false})
@@ -430,7 +432,7 @@ Signature | Return | Explanation
 
 #### Instace Methods
 Instance methods are called like this
-```
+```javascript
 var post = new Post({name: "My Cool Post"});
 post.instanceMethod();
 ```
@@ -451,5 +453,4 @@ Signature | Return | Explanation
 `.depend()` | this | Makes the current computation reactively track this object.
 `.poll()` | computation | Tells an object to watch the database for updates. Returns a computation object, with a `.stop()` method to end the `.poll()`. Polling objects cannot be garbage collected.
 `.stopPoll()` | this | Tells an object to stop polling and allows it to be garbage collected again.
-`.`
 
