@@ -163,7 +163,6 @@ ReactiveClass = function(collection, opts) {
       }
       if (!self._reactive)
         return;
-
       newSelf = collection.findOne(self._id, {transform: null});
       if (newSelf) {
         _.extend(self, newSelf);
@@ -269,13 +268,13 @@ ReactiveClass = function(collection, opts) {
 
   // Temporarily stops reactivity
   ReactiveClass.prototype.lock = function() {
-    this._reactive = true;
+    this._reactive = false;
     return this;
   };
 
   // Turns on reactivity again, 
   ReactiveClass.prototype.unlock = function() {
-    this._reactive = false;
+    this._reactive = true;
     return this;
   };
 
@@ -306,7 +305,8 @@ ReactiveClass = function(collection, opts) {
   // Reactive setter
   ReactiveClass.prototype.set = function(field, value) {
     this[field] = value;
-    this.changed();
+    if (this._reactive)
+      this.changed();
     return this;
   };
 

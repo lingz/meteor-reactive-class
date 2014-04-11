@@ -229,7 +229,7 @@ Tinytest.addAsync("ReactiveClass - Non-Reactive Queries", function(test, next) {
 Tinytest.addAsync("ReactiveClass - Setters and Getters", function(test, next) {
   var PostCollection = new Meteor.Collection(null);
   var Post = new ReactiveClass(PostCollection);
-  post = Post.create({name: "My Cool Post", tag: 5});
+  post = new Post({name: "My Cool Post"});
 
   var count = 0;
   var finalVal;
@@ -242,15 +242,41 @@ Tinytest.addAsync("ReactiveClass - Setters and Getters", function(test, next) {
   test.isTrue(count == 1, "Deps should run once when defined");
 
   post.name = "My Not So Cool Post";
-  test.isFalse(finalVal == "My Very Cool Post", "Deps should not update finalVal on regular set");
+  test.isFalse(finalVal == "My Not So Cool Post", "Deps should not update finalVal on regular set");
   test.isFalse(count == 2, "Deps should not invalidate when during regular assignment");
 
   post.set("name", "My Very Cool Post");
-  test.isTrue(finalVal == "My Very Cool Post", "Deps should begin keep finalVal up to date");
-  test.isTrue(count == 2, "Deps should run again when invalidated");
   Meteor.setTimeout(function() {
-    test.isTrue(finalVal == "My Very Cool Post", "Deps should begin keep finalVal up to date");
+    test.isTrue(finalVal == "My Very Cool Post", "Deps should keep finalVal up to date");
     test.isTrue(count == 2, "Deps should run again when invalidated");
     next();
+  }, 0);
+});
+
+Tinytest.addAsync("ReactiveClass - Locking and Unlocking", function(test, next) {
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection);
+  post = new Post({name: "My Cool Post"});
+
+  var count = 0;
+  var finalVal;
+  post.lock();
+  Deps.autorun(function() {
+    finalVal = post.get("name");
+    count++;
+  });
+
+  post.set("name", "My Not So Cool Post");
+  Meteor.setTimeout(function() {
+    test.isTrue(finalVal == "My Cool Post", "Deps should not run only once finalVal when locked");
+    test.isTrue(count == 1, "Deps should have run only once when locked");
+    post.unlock();
+
+    post.set("name", "My Very Cool Post");
+    Meteor.setTimeout(function() {
+      test.isTrue(finalVal == "My Very Cool Post", "Deps should now keep finalVal up to date since unlocked");
+      test.isTrue(count == 2, "Deps should have run twice now that it has been unlocked");
+      next();
+    }, 0);
   }, 0);
 });
