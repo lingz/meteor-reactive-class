@@ -174,49 +174,57 @@ Tinytest.add("ReactiveClass - Offline fields", function(test) {
   test.isTrue(_.has(newPostRecord, "counter"), "The record should not have the counter field");
 });
 
-Tinytest.addAsync("ReactiveClass - Reactive Queries", function(test, expect) {
+Tinytest.addAsync("ReactiveClass - Reactive Queries", function(test, next) {
   var PostCollection = new Meteor.Collection(null);
   var Post = new ReactiveClass(PostCollection);
   Post.create({name: "My Cool Post", tag: 5});
   var post;
+  var first = true;
+  var compCounter = 0;
   Deps.autorun(function() {
     post = PostCollection.findOne({tag: 5});
   });
-
   var oldPost = post;
+
   post.page = 3;
 
   PostCollection.update(post._id, {
     $set: {
       name: "My Very Cool Post"
     }
-  }, expect(function() {
-    test.isTrue(post != oldPost, "The reactive query should have overwritten our reference to the old object");
-    test.isTrue(post.name == "My Very Cool Post", "We should have the latest version of the post");
-    test.isFalse(post.page, "The state we attached to post should have dissapeared");
-  }));
+  }, function() {
+    Meteor.setTimeout(function() {
+      test.isTrue(post != oldPost, "The reactive query should have overwritten our reference to the old object");
+      test.isTrue(post.name == "My Very Cool Post", "We should have the latest version of the post");
+      test.isFalse(post.page, "The state we attached to post should have dissapeared");
+      next();
+    }, 0);
+  });
 });
 
-
-Tinytest.addAsync("ReactiveClass - Non-Reactive Queries", function(test, expect) {
+Tinytest.addAsync("ReactiveClass - Non-Reactive Queries", function(test, next) {
   var PostCollection = new Meteor.Collection(null);
   var Post = new ReactiveClass(PostCollection);
-  Post.create({name: "My Cool Post", tag: 5});
+  var post1 = Post.create({name: "My Cool Post", tag: 5});
+  post1.page = 5;
   var post;
-  Deps.autorun(function() {
-    post = PostCollection.findOne({tag: 5}, {reactive: false});
-  });
+  post = PostCollection.findOne({tag: 5});
+  post.page = 3;
 
   var oldPost = post;
-  post.page = 3;
 
   PostCollection.update(post._id, {
     $set: {
       name: "My Very Cool Post"
     }
-  }, expect(function() {
-    test.isTrue(post == oldPost, "The reactive query should not have overwritten our reference to the old object");
-    test.isTrue(post.name == "My Very Cool Post", "We should have the latest version of the post");
-    test.isTrue(post.page, "The state we attached to post should have remained");
-  }));
+  }, function() {
+    Meteor.setTimeout(function() {
+      console.log(post);
+      test.isTrue(post == oldPost, "The reactive query should not have overwritten our reference to the old object");
+      test.isTrue(post.name == "My Very Cool Post", "We should have the latest version of the post");
+      test.isTrue(post.page, "The state we attached to post should have remained");
+      next();
+    }, 0);
+  });
 });
+

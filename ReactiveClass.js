@@ -45,8 +45,9 @@ ReactiveClass = function(collection, opts) {
   // this class. Also gives it reactivity if specified
   ReactiveClass._transformRecord = function(doc) {
     var object = new this(doc);
-    if (options.reactive)
+    if (options.reactive) {
       object._setupReactivity();
+    }
     object._exists = true;
     return object;
   };
@@ -151,20 +152,22 @@ ReactiveClass = function(collection, opts) {
   // Setup Reactivity - tells the object to start listening for changes to
   // itself from the server, and if anything changes, it pulls them
   // automatically.
-  ReactiveClass.prototype._setupReactivity = function(runFirstTime) {
-    var firstTime = runFirstTime ? false : true;
+  ReactiveClass.prototype._setupReactivity = function(ignoreFirstTime) {
+    var firstTime = ignoreFirstTime ? true : false;
     var self = this;
     var newSelf;
     this._mongoTracker = Deps.autorun(function(c) {
-      if (!self._reactive)
-        return;
       if (firstTime) {
         firstTime = false;
         return;
       }
-      newSelf = collection.findOne(self._id);
-      if (newSelf)
-        _.extend(self, collection.findOne(self._id));
+      if (!self._reactive)
+        return;
+
+      newSelf = collection.findOne(self._id, {transform: null});
+      if (newSelf) {
+        _.extend(self, newSelf);
+      }
       else {
         self._exists = false;
         self._mongoTracker = null;
@@ -200,7 +203,7 @@ ReactiveClass = function(collection, opts) {
 
     // extract callback if present
     if (arguments.length > 0 && typeof(arguments[arguments.length - 1]) == "function") {
-      callback = args[arguments.length - 1];
+      callback = arguments[arguments.length - 1];
       args = Array.prototype.slice.call(arguments, 0, arguments.length - 1);
     } else {
       callback = defaultUpdateCallback;
@@ -249,7 +252,7 @@ ReactiveClass = function(collection, opts) {
     var insertCallback = function(error) {
       if (error)
         throw error;
-      self._setupReactivity(true);
+      self._setupReactivity();
       self._exists = true;
     };
 
