@@ -306,6 +306,7 @@ ReactiveClass = function(collection, opts) {
   // Reactive setter
   ReactiveClass.prototype.set = function(field, value) {
     this[field] = value;
+    this.changed();
     return this;
   };
 

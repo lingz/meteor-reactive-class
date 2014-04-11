@@ -192,23 +192,23 @@ Tinytest.addAsync("ReactiveClass - Reactive Queries", function(test, next) {
     $set: {
       name: "My Very Cool Post"
     }
-  }, function() {
-    Meteor.setTimeout(function() {
-      test.isTrue(post != oldPost, "The reactive query should have overwritten our reference to the old object");
-      test.isTrue(post.name == "My Very Cool Post", "We should have the latest version of the post");
-      test.isFalse(post.page, "The state we attached to post should have dissapeared");
-      next();
-    }, 0);
   });
+  Meteor.setTimeout(function() {
+    test.isTrue(post != oldPost, "The reactive query should have overwritten our reference to the old object");
+    test.isTrue(post.name == "My Very Cool Post", "We should have the latest version of the post");
+    test.isFalse(post.page, "The state we attached to post should have dissapeared");
+    next();
+  }, 0);
 });
 
 Tinytest.addAsync("ReactiveClass - Non-Reactive Queries", function(test, next) {
   var PostCollection = new Meteor.Collection(null);
   var Post = new ReactiveClass(PostCollection);
-  var post1 = Post.create({name: "My Cool Post", tag: 5});
-  post1.page = 5;
+  Post.create({name: "My Cool Post", tag: 5});
   var post;
-  post = PostCollection.findOne({tag: 5});
+  Deps.autorun(function() {
+    post = PostCollection.findOne({tag: 5}, {reactive: false});
+  });
   post.page = 3;
 
   var oldPost = post;
@@ -217,14 +217,40 @@ Tinytest.addAsync("ReactiveClass - Non-Reactive Queries", function(test, next) {
     $set: {
       name: "My Very Cool Post"
     }
-  }, function() {
-    Meteor.setTimeout(function() {
-      console.log(post);
-      test.isTrue(post == oldPost, "The reactive query should not have overwritten our reference to the old object");
-      test.isTrue(post.name == "My Very Cool Post", "We should have the latest version of the post");
-      test.isTrue(post.page, "The state we attached to post should have remained");
-      next();
-    }, 0);
   });
+  Meteor.setTimeout(function() {
+    test.isTrue(post == oldPost, "The reactive query should not have overwritten our reference to the old object");
+    test.isTrue(post.name == "My Very Cool Post", "We should have the latest version of the post");
+    test.isTrue(post.page, "The state we attached to post should have remained");
+    next();
+  }, 0);
 });
 
+Tinytest.addAsync("ReactiveClass - Setters and Getters", function(test, next) {
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection);
+  post = Post.create({name: "My Cool Post", tag: 5});
+
+  var count = 0;
+  var finalVal;
+  Deps.autorun(function() {
+    finalVal = post.get("name");
+    count++;
+  });
+
+  test.isTrue(finalVal == "My Cool Post", "Deps should begin running and initially set the finalVal");
+  test.isTrue(count == 1, "Deps should run once when defined");
+
+  post.name = "My Not So Cool Post";
+  test.isFalse(finalVal == "My Very Cool Post", "Deps should not update finalVal on regular set");
+  test.isFalse(count == 2, "Deps should not invalidate when during regular assignment");
+
+  post.set("name", "My Very Cool Post");
+  test.isTrue(finalVal == "My Very Cool Post", "Deps should begin keep finalVal up to date");
+  test.isTrue(count == 2, "Deps should run again when invalidated");
+  Meteor.setTimeout(function() {
+    test.isTrue(finalVal == "My Very Cool Post", "Deps should begin keep finalVal up to date");
+    test.isTrue(count == 2, "Deps should run again when invalidated");
+    next();
+  }, 0);
+});
