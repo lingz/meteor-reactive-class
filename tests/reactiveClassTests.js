@@ -114,7 +114,7 @@ Tinytest.add("ReactiveClass - Updating objects on Mongo", function(test) {
   var PostCollection = new Meteor.Collection(null);
   var Post = new ReactiveClass(PostCollection);
 
-  post = Post.create({name: "Cool Post"});
+  var post = Post.create({name: "Cool Post"});
   post.name = "Very Cool Post";
   post.update();
 
@@ -132,7 +132,7 @@ Tinytest.add("ReactiveClass - Updating objects on Mongo", function(test) {
 Tinytest.add("ReactiveClass - Removing objects on Mongo", function(test) {
   var PostCollection = new Meteor.Collection(null);
   var Post = new ReactiveClass(PostCollection);
-  post = Post.create({name: "Cool Post"});
+  var post = Post.create({name: "Cool Post"});
   post.remove();
 
   test.isTrue(PostCollection.find().count() === 0, "Mongo should no longer have the removed object");
@@ -141,7 +141,7 @@ Tinytest.add("ReactiveClass - Removing objects on Mongo", function(test) {
 Tinytest.add("ReactiveClass - Refresh method", function(test) {
   var PostCollection = new Meteor.Collection(null);
   var Post = new ReactiveClass(PostCollection, {reactive: false});
-  post = Post.create({name: "Cool Post"});
+  var post = Post.create({name: "Cool Post"});
 
   post.update({
     $set: {name: "Very Cool Post"}
@@ -149,4 +149,27 @@ Tinytest.add("ReactiveClass - Refresh method", function(test) {
   post.refresh();
 
   test.isTrue(post.name == "Very Cool Post", "An update should make the object be consistent with the database");
+});
+
+Tinytest.add("ReactiveClass - Offline fields", function(test) {
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection);
+  Post.addOfflineFields(["page", "counter"]);
+  var post = Post.create({name: "Cool Post", counter: 5});
+
+
+  post.page = 3;
+  post.update();
+
+  var postRecord = PostCollection.findOne();
+
+  test.isFalse(_.has(postRecord, "page"), "The record should not have the page field");
+  test.isFalse(_.has(postRecord, "counter"), "The record should not have the counter field");
+
+  Post.removeOfflineFields(["page", "counter"]);
+  post.update();
+
+  var newPostRecord = PostCollection.findOne();
+  test.isTrue(_.has(newPostRecord, "page"), "The record should not have the page field");
+  test.isTrue(_.has(newPostRecord, "counter"), "The record should not have the counter field");
 });

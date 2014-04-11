@@ -1,4 +1,6 @@
 ReactiveClass = function(collection, opts) {
+  "use strict";
+
   var defaultOpts = {
     reactive: true,
     transformCollection: true
@@ -243,6 +245,7 @@ ReactiveClass = function(collection, opts) {
   // Inserts an entry into a database for the first time
   ReactiveClass.prototype.put = function(originalCallback) {
     var self = this;
+    var callback;
     var insertCallback = function(error) {
       if (error)
         throw error;
