@@ -68,7 +68,21 @@ Tinytest.add("ReactiveClass - Transform", function(test) {
   CommentCollection.insert({name: "My New Comment"});
 
   var comment = CommentCollection.findOne();
-  test.isTrue(comment instanceof Comment, "transfomr should be true by default");
+  test.isTrue(comment instanceof Comment, "transform should be true by default");
 });
 
+Tinytest.add("ReactiveClass - Client Instantiation", function(test) {
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection, {transformCollection: false});
+
+  var post = new Post({name: "My Cool Post"});
+  test.isTrue(PostCollection.find().count() === 0, "locally instantiated objects should not automatically go into the database");
+  test.isFalse(_.has(post, "_id"), "locally instantiated objects should not automatically have an _id");
+
+  post.put(); 
+  test.isTrue(PostCollection.find().count() === 1, "locally put objects should be in the database");
+  test.isTrue(_.has(post, "_id"), "local put objects should have an _id");
+  console.log(PostCollection.findOne());
+  test.isTrue(PostCollection.findOne().name == post.name, "locally put objects should have their fields correctly inserted");
+});
 

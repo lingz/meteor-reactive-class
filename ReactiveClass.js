@@ -169,12 +169,12 @@ ReactiveClass = function(collection, opts) {
       }
       _.extend(self, collection.findOne(self._id));
     });
-  }
+  };
 
   // Get sanitized version of object
   ReactiveClass.prototype.sanitize = function(keepId) {
     var toRemoveFields = keepId ? offline_fields.concat("_id") : offline_fields;
-    return _.without(this, toRemoveFields);
+    return _.omit(this, toRemoveFields);
   };
 
   // reflect all current updates onto mongo
