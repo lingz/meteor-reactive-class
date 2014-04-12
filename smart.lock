@@ -1,0 +1,19 @@
+{
+  "meteor": {
+    "git": "https://github.com/meteor/meteor.git",
+    "branch": "master",
+    "commit": "886c38bd34ea795a5886297d4c6300816bc85770"
+  },
+  "dependencies": {
+    "basePackages": {
+      "reactive-class": {
+        "path": ""
+      }
+    },
+    "packages": {
+      "reactive-class": {
+        "path": ""
+      }
+    }
+  }
+}

@@ -25,13 +25,16 @@ ReactiveClass = function(collection, opts) {
   ReactiveClass.collection = collection;
 
   // Let Collection queries automatically return instances of this class
-  var setupTransform = function() {
+  ReactiveClass.setupTransform = function() {
+    var self = this;
     collection._transform = function(doc) {
-      return ReactiveClass._transformRecord(doc);
+      return self._transformRecord(doc);
     };
   };
+
   if (options.transformCollection)
-    setupTransform();
+    ReactiveClass.setupTransform();
+    
 
   // decoupling the initializer from the ReactiveClass constructor
   ReactiveClass.initialize = function () {

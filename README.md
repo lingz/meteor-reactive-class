@@ -109,7 +109,8 @@ Extend an existing class. This performs multiple inheritance, creating a new
 class that inherits from both the class being extended, and the reactive class
 doing the extending, with the reactive base class getting the higher priority
 (its methods and fields will overwrite the extended class's ones with the same
-name).
+name). Also, you must call `.setupTransform()` after you are doing creating
+the class if you want automatic database query transforms.
 
 ```javascript
 Post = function(name) {
@@ -127,13 +128,15 @@ PostWithComments = function (commentLimit) {
 }
 
 ReactivePostWithComments = ReactivePost.extend(PostWithComments);
+ReactivePostWithComments.setupTransform();
 
 ```
 
 ### Coffeescript based inheritance
 Easy coffeescript extension that fits well with the syntax. Note that you must
 call `ClassName.initiliaze.call(@)` during the constructor, or the
-ReactiveClass will not correctly get its fields.
+ReactiveClass will not correctly get its fields. You must also call
+`.setupTransform()` manually, if you want automatic database query transforms.
 
 ```coffeescript
 PostCollection = new Meteor.Collection("posts");
@@ -145,6 +148,7 @@ class Post extends ReactiveClass(PostCollection)
 
   getName: () ->
     return this.name
+Post.setuptransform()
 ```
 
 ## Interacting With Mongo
