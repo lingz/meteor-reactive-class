@@ -198,9 +198,9 @@ ReactiveClass = function(collection, opts) {
       self.changed();
     };
     if (callback) {
-      removeCallback = function() {
-        callback();
-        removeCallback();
+      removeCallback = function(err) {
+        callback(err);
+        removeCallback(err);
       };
     }
     collection.remove(this._id, removeCallback);
@@ -218,9 +218,9 @@ ReactiveClass = function(collection, opts) {
     };
 
     if (originalCallback)
-      callback = function() {
-        insertCallback();
-        originalCallback();
+      callback = function(err) {
+        insertCallback(err);
+        originalCallback(err);
       };
     else
       callback = insertCallback;

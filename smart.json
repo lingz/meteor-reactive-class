@@ -3,7 +3,7 @@
   "description": "Reactive Classes backed by Meteor Collections with two-way reactive data binding.",
   "homepage": "https://github.com/lingz/meteor-reactive-class",
   "author": "Lingliang Zhang (https://github.com/lingz)",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "git": "https://github.com/lingz/meteor-reactive-class.git",
   "packages": {}
 }
