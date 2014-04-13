@@ -189,21 +189,23 @@ ReactiveClass = function(collection, opts) {
 
 
   // Removes a database entry
-  ReactiveClass.prototype.remove = function(callback) {
+  ReactiveClass.prototype.remove = function(originalCallback) {
     var self = this;
     var removeCallback = function(error) {
+      self.changed();
       if (error) {
         throw error;
       }
-      self.changed();
     };
-    if (callback) {
-      removeCallback = function(err) {
-        callback(err);
-        removeCallback(err);
+    var callback;
+    if (originalCallback)
+      callback = function(err) {
+        originalCallback.call(this, err);
+        self.changed();
       };
-    }
-    collection.remove(this._id, removeCallback);
+    else
+      callback = removeCallback;
+    collection.remove(this._id, callback);
     this.changed();
     return this;
   };
@@ -213,14 +215,14 @@ ReactiveClass = function(collection, opts) {
     var self = this;
     var callback;
     var insertCallback = function(error) {
+      self.changed();
       if (error)
         throw error;
     };
-
     if (originalCallback)
       callback = function(err) {
-        insertCallback(err);
-        originalCallback(err);
+        originalCallback.call(this, err);
+        self.changed();
       };
     else
       callback = insertCallback;
