@@ -52,9 +52,7 @@ ReactiveClass = function(collection, opts) {
   // static methods
   ReactiveClass.create = function(newObject, originalCallback) {
     var object = new this(newObject);
-    object.put(originalCallback);
-    object.refresh()
-    return object;
+    return object.put(originalCallback);
   };
 
   // reactively fetch an array of objects
@@ -229,6 +227,7 @@ ReactiveClass = function(collection, opts) {
     else
       callback = insertCallback;
     this._id = collection.insert(this.sanitize(true), callback);
+    this.refresh();
     return this;
   };
 
