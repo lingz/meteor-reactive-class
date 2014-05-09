@@ -290,7 +290,7 @@ ReactiveClass = function(collection, opts) {
   ReactiveClass.prototype.poll = function() {
     var self = this;
     var newSelf;
-    this._mongoTracker = Deps.autorun(function(c) {
+    this._mongoTracker = Deps.autorun(Meteor.bindEnvironment(function(c) {
       if (!self._reactive)
         return;
       newSelf = collection.findOne(self._id, {transform: null});
@@ -303,7 +303,7 @@ ReactiveClass = function(collection, opts) {
         c.stop();
       }
       self.changed();
-    });
+    }));
     return this._mongoTracker;
   };
 
