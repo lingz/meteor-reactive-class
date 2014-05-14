@@ -195,7 +195,6 @@ Tinytest.add("ReactiveClass - Offline fields", function(test) {
   Post.addOfflineFields(["page", "counter"]);
   var post = Post.create({name: "Cool Post", counter: 5});
 
-
   post.page = 3;
   post.update();
 
@@ -210,6 +209,29 @@ Tinytest.add("ReactiveClass - Offline fields", function(test) {
   var newPostRecord = PostCollection.findOne();
   test.isTrue(_.has(newPostRecord, "page"), "The record should not have the page field");
   test.isTrue(_.has(newPostRecord, "counter"), "The record should not have the counter field");
+});
+
+Tinytest.add("ReactiveClass - Do Not Update fields", function(test) {
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection);
+  Post.addDoNotUpdateFields(["counter"]);
+  var post = Post.create({name: "Cool Post", counter: 5});
+
+  post.counter = 7;
+  post.update();
+
+  var postRecord = PostCollection.findOne();
+
+  test.isFalse(_.has(postRecord, "page"), "The record should not have the page field");
+  test.isTrue(_.has(postRecord, "counter"), "The record should have the counter field");
+  test.isTrue(postRecord.counter != 7, "The record should not have updated the counter field");
+
+  Post.removeDoNotUpdateFields("counter");
+  post.counter = 7;
+  post.update();
+  var newPostRecord = PostCollection.findOne();
+  test.isTrue(newPostRecord.counter == 7,
+              "The record should now have updated the counter field");
 });
 
 Tinytest.addAsync("ReactiveClass - Reactive Queries", function(test, next) {

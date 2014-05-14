@@ -293,6 +293,13 @@ console.log(post);
 >> {_id: "YN2nZmczPsk3jvPuL", name: "Cool Post", currentPage: 2, currentComment: 3 }
 ```
 
+And sometimes you want fields that can be created but not updated, such as a
+created timestamp.
+
+```javascript
+Post.addDoNotUpdateFields(["created"])
+```
+
 ## Reactivity
 
 ### Queries
@@ -430,6 +437,8 @@ Signature | Return | Explanation
 `.fetchOne(selector, [options])` | instance of Class | Identical to [Collection.findOne()](http://docs.meteor.com/#findone) except it returns an class instance instead of a record. This method is reactive unless an id string is passed in, in which case it is not.
 `.addOfflineFields(newOfflineFields)` | undefined | Adds fields which are not to be synced with MongoDB
 `.removeOfflineFields(toRemoveOfflineFields)` | undefined | Inverse operation of `.addOfflineFields()`
+`.addDoNotUpdateFields(newDoNotUpdateFields)` | undefined | Adds fields which are not to be updated on MongoDB
+`.removeDoNotUpdateFields(newDoNotUpdateFields)` | undefined | Inverse operation of `.addDoNotUpdateFields()`
 `.extend(childClass)` | new Class | Creates a new class, which double inherits from both the specified child class, and the current Reactive Class.
 
 ### Instace Methods

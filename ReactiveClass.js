@@ -10,7 +10,9 @@ ReactiveClass = function(collection, opts) {
   // offline fields which we are not going to sync with mongoDB, and its clone
   // containing the mutable version
   var default_offline_fields = ["_dep", "_reactive", "_mongoTracker"];
+  var default_do_not_update_fields = ["_id"];
   var offline_fields = Array.prototype.slice.call(default_offline_fields);
+  var do_not_update_fields = Array.prototype.slice.call(default_do_not_update_fields);
 
   var ReactiveClass = function(fields) {
     _.extend(this, fields);
@@ -112,6 +114,23 @@ ReactiveClass = function(collection, opts) {
     offline_fields = _.difference(offline_fields, toRemoveOfflineFields);
   };
 
+  // Registering a do not update field
+  ReactiveClass.addDoNotUpdateFields = function(newDoNotUpdateFields) {
+    do_not_update_fields = _.union(do_not_update_fields, newDoNotUpdateFields);
+  };
+
+  // deregistering an offline field
+  ReactiveClass.removeDoNotUpdateFields = function(toRemoveDoNotUpdateFields) {
+    if (_.intersection(default_do_not_update_fields,
+          toRemoveDoNotUpdateFields).length > 0)
+      throw new Meteor.Error(500,
+        default_offline_fields.toString() + " are protected do not update fields " +
+        "and cannot be removed"
+      );
+    do_not_update_fields = _.difference(do_not_update_fields,
+                                        toRemoveDoNotUpdateFields);
+  };
+
   // Creates a new class, which double inherits from both the specified child
   // class, and the current Reactive Class.
   ReactiveClass.extend = function(childClass) {
@@ -127,13 +146,13 @@ ReactiveClass = function(collection, opts) {
         ReactiveClass.initialize.call(this);
         return this;
       };
-      var dummyClass = function() {};
+      var DummyClass = function() {};
       // multiple inheritance, from both the extended class, and from itself.
-      _.extend(dummyClass.prototype, childClass.prototype);
-      _.extend(dummyClass.prototype, this.prototype);
+      _.extend(DummyClass.prototype, childClass.prototype);
+      _.extend(DummyClass.prototype, this.prototype);
       _.extend(constructor, childClass);
       _.extend(constructor, this);
-      constructor.prototype = new dummyClass();
+      constructor.prototype = new DummyClass();
     }
     return constructor;
   };
@@ -143,8 +162,10 @@ ReactiveClass = function(collection, opts) {
 
 
   // Get sanitized version of object
-  ReactiveClass.prototype.sanitize = function(keepId) {
+  ReactiveClass.prototype.sanitize = function(keepId, isUpdate) {
     var toRemoveFields = keepId ? offline_fields : offline_fields.concat("_id");
+    if (isUpdate)
+      toRemoveFields = _.union(offline_fields, do_not_update_fields);
     return _.omit(this, toRemoveFields);
   };
 
@@ -179,7 +200,7 @@ ReactiveClass = function(collection, opts) {
       collection.update.apply(collection, _.union([this._id], args, callback));
     } else {
       collection.update(this._id, {
-        "$set": this.sanitize()
+        "$set": this.sanitize(false, true)
       }, callback);
     }
     this.refresh();
