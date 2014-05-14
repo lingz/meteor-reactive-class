@@ -221,8 +221,8 @@ ReactiveClass = function(collection, opts) {
     };
     if (originalCallback)
       callback = function(err) {
+        insertCallback(err);
         originalCallback.call(this, err);
-        self.changed();
       };
     else
       callback = insertCallback;
