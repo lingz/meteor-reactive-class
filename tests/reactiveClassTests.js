@@ -360,3 +360,24 @@ Tinytest.addAsync("ReactiveClass - Locking and Unlocking", function(test, next) 
     }, 0);
   }, 0);
 });
+
+Tinytest.add("ReactiveClass - Expanding properties", function(test) {
+  var CategoryCollection = new Meteor.Collection(null);
+  var Category = new ReactiveClass(CategoryCollection);
+
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection, {
+    expand: [{
+      idField: 'categoryIds',
+      objField: 'categories',
+      collection: CategoryCollection
+    }]
+  });
+
+  var category = Category.create({'name': 'General'});
+  var post = Post.create({name: "New Post", categoryIds: [category._id]});
+
+  test.isTrue(_.has(post, "categories"), "The created post should have the new field categories");
+  test.isTrue(post.categories[0]._id == category._id, "The _id of the first element in the new field should be equal to the category object.");
+
+});
