@@ -1,5 +1,8 @@
 Package.describe({
-  summary: "Reactive Base class for building objects backed by Collection data" 
+  summary: "Reactive Base class for building objects backed by Collection data",
+  version: '1.2.0',
+  name: "mrt:reactive-class",
+  githubUrl: 'https://github.com/lingz/meteor-reactive-class',
 });
 
 Package.on_use(function(api) {
