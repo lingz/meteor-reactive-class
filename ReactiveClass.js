@@ -49,20 +49,6 @@ ReactiveClass = function(collection, opts) {
   // this class. Also gives it reactivity if specified
   ReactiveClass._transformRecord = function(doc) {
     var object = new this(doc);
-
-    if(typeof(options.expand)!='undefined') {
-      options.expand.forEach(function(elm){
-        object[elm.objField] = [];
-
-        object[elm.idField].forEach(function(obj){
-          var item = elm.collection.findOne(obj);
-
-          if(typeof(item)=="undefined") return;
-
-          object[elm.objField].push(item);
-        })
-      });
-    }
     return object;
   };
 
@@ -292,6 +278,22 @@ ReactiveClass = function(collection, opts) {
       return;
     }
     _.extend(this, newFields);
+
+    if(typeof(options.expand)!='undefined') {
+      var self = this;
+      options.expand.forEach(function(elm){
+        self[elm.objField] = [];
+
+        self[elm.idField].forEach(function(obj){
+          var item = elm.collection.findOne(obj);
+
+          if(!item) return;
+
+          self[elm.objField].push(item);
+        })
+      });
+    }
+
     this.changed();
     return this;
   };
