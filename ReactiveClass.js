@@ -49,6 +49,7 @@ ReactiveClass = function(collection, opts) {
   // this class. Also gives it reactivity if specified
   ReactiveClass._transformRecord = function(doc) {
     var object = new this(doc);
+    object.expand();
     return object;
   };
 
@@ -266,6 +267,42 @@ ReactiveClass = function(collection, opts) {
     return this;
   };
 
+  //resolve object path
+  var resolveObj = function(path, obj) {
+    return [obj || self].concat(path.split('.')).reduce(function(prev, curr) {
+      return prev[curr];
+    });
+  }
+
+  //resolve object relationships
+  ReactiveClass.prototype.expand = function() {
+    var self = this;
+    var resolve = function(elm) {
+      var idField = resolveObj(elm.idField, self);
+      if(idField instanceof Array) {
+        self[elm.objField] = [];
+        idField.forEach(function(obj){
+          var item = elm.collection.findOne(obj);
+
+          if(!item) return;
+
+          self[elm.objField].push(item);
+        })
+      }else{
+        var item = elm.collection.findOne(idField);
+        if(!item) return;
+        self[elm.objField] = item;
+      }
+    }
+    if(options.expand instanceof Array) {
+      options.expand.forEach(function(elm){
+        resolve(elm);
+      });
+    } else if(typeof(options.expand)=="object") {
+      resolve(options.expand);
+    }
+  }
+
   // Force a one-off database refresh
   ReactiveClass.prototype.refresh = function() {
     if (!this._id)
@@ -273,26 +310,13 @@ ReactiveClass = function(collection, opts) {
         "Cannot refresh as this object has no _id. " +
         "Perhaps it was never inserted before."
       );
-    var newFields = collection.findOne(this._id);
+    var newFields = collection.findOne(this._id, {transform: null});
     if (!newFields) {
       return;
     }
     _.extend(this, newFields);
 
-    if(typeof(options.expand)!='undefined') {
-      var self = this;
-      options.expand.forEach(function(elm){
-        self[elm.objField] = [];
-
-        self[elm.idField].forEach(function(obj){
-          var item = elm.collection.findOne(obj);
-
-          if(!item) return;
-
-          self[elm.objField].push(item);
-        })
-      });
-    }
+    this.expand();
 
     this.changed();
     return this;
