@@ -270,7 +270,9 @@ ReactiveClass = function(collection, opts) {
   //resolve object path
   var resolveObj = function(path, obj) {
     return [obj || self].concat(path.split('.')).reduce(function(prev, curr) {
-      return prev[curr];
+      if(prev) {
+        return prev[curr];
+      }
     });
   }
 
