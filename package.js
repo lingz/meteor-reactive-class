@@ -1,8 +1,8 @@
 Package.describe({
   summary: "Reactive Base class for building objects backed by Collection data",
   version: '1.2.0',
-  name: "oafmedium:reactive-class",
-  githubUrl: 'https://github.com/oafmedium/meteor-reactive-class',
+  name: "mrt:reactive-class",
+  githubUrl: 'https://github.com/lingz/meteor-reactive-class',
 });
 
 Package.on_use(function(api) {
