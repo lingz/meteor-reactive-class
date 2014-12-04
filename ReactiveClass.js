@@ -269,11 +269,23 @@ ReactiveClass = function(collection, opts) {
 
   //resolve object path
   var resolveObj = function(path, obj) {
-    return [obj || self].concat(path.split('.')).reduce(function(prev, curr) {
+    return [obj].concat(path.split('.')).reduce(function(prev, curr) {
       if(prev) {
+        if(!prev[curr]) prev[curr] = {};
         return prev[curr];
       }
     });
+  }
+
+  var objectAtPath = function(obj, path, fn) {
+    var pathArray = path.split('.');
+    var lastPath = pathArray.pop();
+    var objAtPath = obj;
+    if (pathArray.length > 0) {
+      objAtPath = resolveObj(pathArray.join('.'), obj);
+    }
+
+    fn(objAtPath, lastPath);
   }
 
   //resolve object relationships
@@ -282,18 +294,24 @@ ReactiveClass = function(collection, opts) {
     var resolve = function(elm) {
       var idField = resolveObj(elm.idField, self);
       if(idField instanceof Array) {
-        self[elm.objField] = [];
+        objectAtPath(self, elm.objField, function(obj,path) {
+          obj[path] = [];
+        });
         idField.forEach(function(obj){
           var item = elm.collection.findOne(obj);
 
           if(!item) return;
 
-          self[elm.objField].push(item);
+          objectAtPath(self, elm.objField, function(obj,path) {
+            obj[path].push(item);
+          });
         })
       }else{
         var item = elm.collection.findOne(idField);
         if(!item) return;
-        self[elm.objField] = item;
+        objectAtPath(self, elm.objField, function(obj,path) {
+          obj[path] = item;
+        });
       }
     }
     if(options.expand instanceof Array) {
@@ -303,6 +321,7 @@ ReactiveClass = function(collection, opts) {
     } else if(typeof(options.expand)=="object") {
       resolve(options.expand);
     }
+    return this;
   }
 
   // Force a one-off database refresh
