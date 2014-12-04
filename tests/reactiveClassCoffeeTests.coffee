@@ -23,5 +23,3 @@ Tinytest.add "ReactiveClass - Coffee Instantiation", (test) ->
   Post.setupTransform()
   newPostRecord = PostCollection.findOne()
   test.isTrue(newPostRecord instanceof Post, "Collection has now been transformed")
-
-

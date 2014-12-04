@@ -37,7 +37,7 @@ ReactiveClass = function(collection, opts) {
 
   if (options.transformCollection)
     ReactiveClass.setupTransform();
-    
+
 
   // decoupling the initializer from the ReactiveClass constructor
   ReactiveClass.initialize = function () {
@@ -260,7 +260,7 @@ ReactiveClass = function(collection, opts) {
     return this;
   };
 
-  // Turns on reactivity again, 
+  // Turns on reactivity again,
   ReactiveClass.prototype.unlock = function() {
     this._reactive = true;
     this.changed();
@@ -383,4 +383,3 @@ ReactiveClass = function(collection, opts) {
   return ReactiveClass;
 
 };
-

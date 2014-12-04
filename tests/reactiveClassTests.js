@@ -79,7 +79,7 @@ Tinytest.add("ReactiveClass - Client Instantiation", function(test) {
   test.isTrue(PostCollection.find().count() === 0, "locally instantiated objects should not automatically go into the database");
   test.isFalse(_.has(post, "_id"), "locally instantiated objects should not automatically have an _id");
 
-  post.put(); 
+  post.put();
   test.isTrue(PostCollection.find().count() === 1, "locally put objects should be in the database");
   test.isTrue(_.has(post, "_id"), "local put objects should have an _id");
   test.isTrue(PostCollection.findOne().name == post.name, "locally put objects should have their fields correctly inserted");
@@ -106,7 +106,7 @@ Tinytest.add("ReactiveClass - Creating an object for Mongo", function(test) {
   var newPost = Post.create({name: "New Post"});
 
   test.isTrue(_.has(newPost, "_id", "name"), "The created object should have its own fields and an _id");
-  test.isTrue(PostCollection.findOne({name: "New Post"}), "The created object should have a record in mongo."); 
+  test.isTrue(PostCollection.findOne({name: "New Post"}), "The created object should have a record in mongo.");
 
 });
 
