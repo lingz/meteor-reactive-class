@@ -361,7 +361,7 @@ Tinytest.addAsync("ReactiveClass - Locking and Unlocking", function(test, next) 
   }, 0);
 });
 
-Tinytest.add("ReactiveClass - Expanding properties", function(test) {
+Tinytest.add("ReactiveClass - Expanding properties - Options array", function(test) {
   var CategoryCollection = new Meteor.Collection(null);
   var Category = new ReactiveClass(CategoryCollection);
 
@@ -378,6 +378,91 @@ Tinytest.add("ReactiveClass - Expanding properties", function(test) {
   var post = Post.create({name: "New Post", categoryIds: [category._id]});
 
   test.isTrue(_.has(post, "categories"), "The created post should have the new field categories");
-  test.isTrue(post.categories[0]._id == category._id, "The _id of the first element in the new field should be equal to the category object.");
+  test.isTrue(post.categories[0]._id == category._id, "The _id of the first element in the new field should be equal to the one in the category object.");
+
+});
+
+Tinytest.add("ReactiveClass - Expanding properties - Options object", function(test) {
+  var CategoryCollection = new Meteor.Collection(null);
+  var Category = new ReactiveClass(CategoryCollection);
+
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection, {
+    expand: {
+      idField: 'categoryIds',
+      objField: 'categories',
+      collection: CategoryCollection
+    }
+  });
+
+  var category = Category.create({'name': 'General'});
+  var post = Post.create({name: "New Post", categoryIds: [category._id]});
+
+  test.isTrue(_.has(post, "categories"), "The created post should have the new field categories");
+  test.isTrue(post.categories[0]._id == category._id, "The _id of the first element in the new field should be equal to the one in the category object.");
+
+});
+
+Tinytest.add("ReactiveClass - Expanding properties - Expanding object insteadof array", function(test) {
+  var CategoryCollection = new Meteor.Collection(null);
+  var Category = new ReactiveClass(CategoryCollection);
+
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection, {
+    expand: {
+      idField: 'categoryId',
+      objField: 'category',
+      collection: CategoryCollection
+    }
+  });
+
+  var category = Category.create({'name': 'General'});
+  var post = Post.create({name: "New Post", categoryId: category._id});
+
+  test.isTrue(_.has(post, "category"), "The created post should have the new field category");
+  test.isTrue(post.category._id == category._id, "The _id of the new field should be equal to the one in the category object.");
+
+});
+
+Tinytest.add("ReactiveClass - Expanding properties - Expanding from subobject", function(test) {
+  var CategoryCollection = new Meteor.Collection(null);
+  var Category = new ReactiveClass(CategoryCollection);
+
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection, {
+    expand: {
+      idField: 'props.categoryIds',
+      objField: 'categories',
+      collection: CategoryCollection
+    }
+  });
+
+  var category = Category.create({'name': 'General'});
+  var post = Post.create({name: "New Post", props: {categoryIds: category._id}});
+
+  test.isTrue(_.has(post, "categories"), "The created post should have the new field categories");
+  test.isTrue(post.categories[0]._id == category._id, "The _id of the first element in the new field should be equal to the one in the category object.");
+
+});
+
+Tinytest.add("ReactiveClass - Expanding properties - Expanding to subobject", function(test) {
+  var CategoryCollection = new Meteor.Collection(null);
+  var Category = new ReactiveClass(CategoryCollection);
+
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection, {
+    expand: {
+      idField: 'categoryIds',
+      objField: 'props.categories',
+      collection: CategoryCollection
+    }
+  });
+
+  var category = Category.create({'name': 'General'});
+  var post = Post.create({name: "New Post", categoryIds: category._id});
+
+  test.isTrue(_.has(post, "props"), "The created post should have the new field props");
+  test.isTrue(_.has(post.props, "categories"), "The object post.props should have the field categories");
+  test.isTrue(post.props.categories[0]._id == category._id, "The _id of the first element in the new field should be equal to the one in the category object.");
 
 });
