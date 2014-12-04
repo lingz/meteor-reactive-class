@@ -361,7 +361,7 @@ Tinytest.addAsync("ReactiveClass - Locking and Unlocking", function(test, next) 
   }, 0);
 });
 
-Tinytest.add("ReactiveClass - Expanding properties - Options array", function(test) {
+Tinytest.add("ReactiveClass - Expanding properties via options array", function(test) {
   var CategoryCollection = new Meteor.Collection(null);
   var Category = new ReactiveClass(CategoryCollection);
 
@@ -382,7 +382,7 @@ Tinytest.add("ReactiveClass - Expanding properties - Options array", function(te
 
 });
 
-Tinytest.add("ReactiveClass - Expanding properties - Options object", function(test) {
+Tinytest.add("ReactiveClass - Expanding properties via options object", function(test) {
   var CategoryCollection = new Meteor.Collection(null);
   var Category = new ReactiveClass(CategoryCollection);
 
@@ -403,7 +403,7 @@ Tinytest.add("ReactiveClass - Expanding properties - Options object", function(t
 
 });
 
-Tinytest.add("ReactiveClass - Expanding properties - Expanding object insteadof array", function(test) {
+Tinytest.add("ReactiveClass - Expanding object instead of array", function(test) {
   var CategoryCollection = new Meteor.Collection(null);
   var Category = new ReactiveClass(CategoryCollection);
 
@@ -424,7 +424,7 @@ Tinytest.add("ReactiveClass - Expanding properties - Expanding object insteadof 
 
 });
 
-Tinytest.add("ReactiveClass - Expanding properties - Expanding from subobject", function(test) {
+Tinytest.add("ReactiveClass - Expanding from subobject", function(test) {
   var CategoryCollection = new Meteor.Collection(null);
   var Category = new ReactiveClass(CategoryCollection);
 
@@ -438,14 +438,14 @@ Tinytest.add("ReactiveClass - Expanding properties - Expanding from subobject", 
   });
 
   var category = Category.create({'name': 'General'});
-  var post = Post.create({name: "New Post", props: {categoryIds: category._id}});
+  var post = Post.create({name: "New Post", props: {categoryIds: [category._id]}});
 
   test.isTrue(_.has(post, "categories"), "The created post should have the new field categories");
   test.isTrue(post.categories[0]._id == category._id, "The _id of the first element in the new field should be equal to the one in the category object.");
 
 });
 
-Tinytest.add("ReactiveClass - Expanding properties - Expanding to subobject", function(test) {
+Tinytest.add("ReactiveClass - Expanding to subobject with array", function(test) {
   var CategoryCollection = new Meteor.Collection(null);
   var Category = new ReactiveClass(CategoryCollection);
 
@@ -459,7 +459,7 @@ Tinytest.add("ReactiveClass - Expanding properties - Expanding to subobject", fu
   });
 
   var category = Category.create({'name': 'General'});
-  var post = Post.create({name: "New Post", categoryIds: category._id});
+  var post = Post.create({name: "New Post", categoryIds: [category._id]});
 
   test.isTrue(_.has(post, "props"), "The created post should have the new field props");
   test.isTrue(_.has(post.props, "categories"), "The object post.props should have the field categories");
