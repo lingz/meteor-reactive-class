@@ -89,6 +89,7 @@ Field               | Default   | Explanation
 --------------------|-----------|------------
 reactive            | true      | Whether objects are by default reactive, that is their setters invalidate.
 transformCollection | true      | Whether collection queries automatically return objects cast into this class. Set to false if you are using the same collection for multiple classes.
+expand              | null      | Take a look at the "Resolving relationships" section
 
 ## Setup
 
@@ -300,6 +301,25 @@ created timestamp.
 Post.addDoNotUpdateFields(["created"])
 ```
 
+### Resolving relationships
+With the 'expand' option, ReactiveClass is able to resolve relationships. The expand option can be specified as an object or as an array, if you have more than one relationship in a collection.
+The expand object must have 3 properties:
+* `idField`: Path to the field with Id's with which the objects in the other collection are looked up. The value of the field can be a string (with one Id) or an array if you have more than one.
+* `objField`: Path to the field in which the looked up objects are stored
+* `collection`: The collection object for looking up the objects
+
+```javascript
+var Post = new ReactiveClass(PostCollection, {
+  expand: {
+    idField: 'categoryIds',
+    objField: 'props.category',
+    collection: CategoryCollection
+  }
+});
+```
+
+Relationships will be automatically resolved if you fetch an object and when the `refresh` function is called. You can also do it manually with calling the `expand` function.
+
 ## Reactivity
 
 ### Queries
@@ -458,6 +478,7 @@ Signature | Return | Explanation
 `.lock()` | this | Temporarily disables all reactive updates on this object.
 `.unlock()` | this | Re-enables all reactive updates on this object. This won't turn on reactivity, if the class was created with `{reactive: false}`.
 `.refresh()` | this | Synchronizes all fields of the object with mongoDB, even if reactivity is turned off.
+`.expand()` | this | Resolve relationships specified via the `expand` option
 `.get(field)` | value | Reactively returns a top level field of this object
 `.set(field, value)` | this | Sets a top level field of this object and invalidates computations tracking the object. Does not cause a mongoDB update.
 `.changed()` | this | Invalidates all computations tracking this object.
