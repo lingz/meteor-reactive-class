@@ -12,6 +12,9 @@ ReactiveClass = function(collection, opts) {
   // containing the mutable version
   var default_offline_fields = ["_dep", "_reactive", "_mongoTracker"];
   var default_do_not_update_fields = ["_id"];
+  if(options.expand && options.expand.objField) {
+    default_do_not_update_fields.push(options.expand.objField);
+  }
   var offline_fields = Array.prototype.slice.call(default_offline_fields);
   var do_not_update_fields = Array.prototype.slice.call(default_do_not_update_fields);
 
@@ -159,16 +162,57 @@ ReactiveClass = function(collection, opts) {
     return constructor;
   };
 
+  //resolve object path
+  var resolveObj = function(path, obj) {
+    return [obj].concat(path.split('.')).reduce(function(prev, curr) {
+      if(prev) {
+        if(!prev[curr]) prev[curr] = {};
+        return prev[curr];
+      }
+    });
+  }
+
+  var objectAtPath = function(obj, path, fn) {
+    var pathArray = path.split('.');
+    var lastPath = pathArray.pop();
+    var objAtPath = obj;
+    if (pathArray.length > 0) {
+      objAtPath = resolveObj(pathArray.join('.'), obj);
+    }
+
+    fn(objAtPath, lastPath);
+  }
+
+  var objOmit = function(origObj, fields) {
+    var obj = _.clone(origObj);
+    fields.forEach(function(field){
+      objectAtPath(obj, field, function(tmpObj, path){
+        delete tmpObj[path];
+      });
+      var tmp = field.split('.');
+
+      // clean object path
+      do {
+        var val = resolveObj(tmp.join('.'), obj);
+        if(_.isEmpty(val)) {
+          objectAtPath(obj, tmp.join('.'), function(tmpObj, path){
+            delete tmpObj[path];
+          });
+        }
+        tmp.pop();
+      } while(tmp.length > 0);
+    });
+    return obj;
+  }
 
   // Instance methods
-
 
   // Get sanitized version of object
   ReactiveClass.prototype.sanitize = function(keepId, isUpdate) {
     var toRemoveFields = keepId ? offline_fields : offline_fields.concat("_id");
     if (isUpdate)
       toRemoveFields = _.union(offline_fields, do_not_update_fields);
-    return _.omit(this, toRemoveFields);
+    return objOmit(this, toRemoveFields);
   };
 
 
@@ -266,27 +310,6 @@ ReactiveClass = function(collection, opts) {
     this.changed();
     return this;
   };
-
-  //resolve object path
-  var resolveObj = function(path, obj) {
-    return [obj].concat(path.split('.')).reduce(function(prev, curr) {
-      if(prev) {
-        if(!prev[curr]) prev[curr] = {};
-        return prev[curr];
-      }
-    });
-  }
-
-  var objectAtPath = function(obj, path, fn) {
-    var pathArray = path.split('.');
-    var lastPath = pathArray.pop();
-    var objAtPath = obj;
-    if (pathArray.length > 0) {
-      objAtPath = resolveObj(pathArray.join('.'), obj);
-    }
-
-    fn(objAtPath, lastPath);
-  }
 
   //resolve object relationships
   ReactiveClass.prototype.expand = function() {
