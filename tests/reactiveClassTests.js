@@ -488,3 +488,33 @@ Tinytest.add("ReactiveClass - Expanding to subobject", function(test) {
   test.isTrue(post.props.category._id == category._id, "The _id of the first element in the new field should be equal to the one in the category object.");
 
 });
+
+Tinytest.add("ReactiveClass - Don\'t save expanded object", function(test) {
+  var CategoryCollection = new Meteor.Collection(null);
+  var Category = new ReactiveClass(CategoryCollection);
+
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection, {
+    expand: {
+      idField: 'categoryId',
+      objField: 'props.category',
+      collection: CategoryCollection
+    },
+    transformCollection: false
+  });
+
+  var category = Category.create({'name': 'General'});
+  var post = Post.create({name: "New Post", categoryId: category._id});
+  post.update()
+
+  var post2 = Post.create({name: 'New Post 2', categoryId: category._id, props: {test: true}});
+  post2.update()
+
+  var newPost = PostCollection.findOne(post._id);
+  var newPost2 = PostCollection.findOne(post2._id);
+
+  test.isFalse(_.has(newPost, "props"), "The first fetched post shouldn't have the field props");
+  test.isTrue(_.has(newPost2, "props"), "The second fetched post should have the field props");
+  test.isFalse(_.has(newPost2.props, "category"), "The second fetched post shouldn't have the field props.category");
+
+});
