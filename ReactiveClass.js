@@ -12,8 +12,14 @@ ReactiveClass = function(collection, opts) {
   // containing the mutable version
   var default_offline_fields = ["_dep", "_reactive", "_mongoTracker"];
   var default_do_not_update_fields = ["_id"];
-  if(options.expand && options.expand.objField) {
-    default_do_not_update_fields.push(options.expand.objField);
+  if(options.expand) {
+    if (options.expand instanceof Array) {
+      options.expand.forEach(function(elm){
+        default_do_not_update_fields.push(elm.objField);
+      })
+    } else {
+      default_do_not_update_fields.push(options.expand.objField);
+    }
   }
   var offline_fields = Array.prototype.slice.call(default_offline_fields);
   var do_not_update_fields = Array.prototype.slice.call(default_do_not_update_fields);

@@ -518,3 +518,27 @@ Tinytest.add("ReactiveClass - Don\'t save expanded object", function(test) {
   test.isFalse(_.has(newPost2.props, "category"), "The second fetched post shouldn't have the field props.category");
 
 });
+
+Tinytest.add("ReactiveClass - Don\'t save expanded object if initialized with array", function(test) {
+  var CategoryCollection = new Meteor.Collection(null);
+  var Category = new ReactiveClass(CategoryCollection);
+
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection, {
+    expand: [{
+      idField: 'categoryId',
+      objField: 'category',
+      collection: CategoryCollection
+    }],
+    transformCollection: false
+  });
+
+  var category = Category.create({'name': 'General'});
+  var post = Post.create({name: "New Post", categoryId: category._id});
+  post.update()
+
+  var newPost = PostCollection.findOne(post._id);
+
+  test.isFalse(_.has(newPost, "category"), "The fetched post shouldn't have the field category");
+
+});
