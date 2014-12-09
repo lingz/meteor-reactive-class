@@ -79,7 +79,7 @@ Tinytest.add("ReactiveClass - Client Instantiation", function(test) {
   test.isTrue(PostCollection.find().count() === 0, "locally instantiated objects should not automatically go into the database");
   test.isFalse(_.has(post, "_id"), "locally instantiated objects should not automatically have an _id");
 
-  post.put(); 
+  post.put();
   test.isTrue(PostCollection.find().count() === 1, "locally put objects should be in the database");
   test.isTrue(_.has(post, "_id"), "local put objects should have an _id");
   test.isTrue(PostCollection.findOne().name == post.name, "locally put objects should have their fields correctly inserted");
@@ -106,7 +106,7 @@ Tinytest.add("ReactiveClass - Creating an object for Mongo", function(test) {
   var newPost = Post.create({name: "New Post"});
 
   test.isTrue(_.has(newPost, "_id", "name"), "The created object should have its own fields and an _id");
-  test.isTrue(PostCollection.findOne({name: "New Post"}), "The created object should have a record in mongo."); 
+  test.isTrue(PostCollection.findOne({name: "New Post"}), "The created object should have a record in mongo.");
 
 });
 
@@ -359,4 +359,186 @@ Tinytest.addAsync("ReactiveClass - Locking and Unlocking", function(test, next) 
       next();
     }, 0);
   }, 0);
+});
+
+Tinytest.add("ReactiveClass - Expanding properties via options array", function(test) {
+  var CategoryCollection = new Meteor.Collection(null);
+  var Category = new ReactiveClass(CategoryCollection);
+
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection, {
+    expand: [{
+      idField: 'categoryIds',
+      objField: 'categories',
+      collection: CategoryCollection
+    }]
+  });
+
+  var category = Category.create({'name': 'General'});
+  var post = Post.create({name: "New Post", categoryIds: [category._id]});
+
+  test.isTrue(_.has(post, "categories"), "The created post should have the new field categories");
+  test.isTrue(post.categories[0]._id == category._id, "The _id of the first element in the new field should be equal to the one in the category object.");
+
+});
+
+Tinytest.add("ReactiveClass - Expanding properties via options object", function(test) {
+  var CategoryCollection = new Meteor.Collection(null);
+  var Category = new ReactiveClass(CategoryCollection);
+
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection, {
+    expand: {
+      idField: 'categoryIds',
+      objField: 'categories',
+      collection: CategoryCollection
+    }
+  });
+
+  var category = Category.create({'name': 'General'});
+  var post = Post.create({name: "New Post", categoryIds: [category._id]});
+
+  test.isTrue(_.has(post, "categories"), "The created post should have the new field categories");
+  test.isTrue(post.categories[0]._id == category._id, "The _id of the first element in the new field should be equal to the one in the category object.");
+
+});
+
+Tinytest.add("ReactiveClass - Expanding object instead of array", function(test) {
+  var CategoryCollection = new Meteor.Collection(null);
+  var Category = new ReactiveClass(CategoryCollection);
+
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection, {
+    expand: {
+      idField: 'categoryId',
+      objField: 'category',
+      collection: CategoryCollection
+    }
+  });
+
+  var category = Category.create({'name': 'General'});
+  var post = Post.create({name: "New Post", categoryId: category._id});
+
+  test.isTrue(_.has(post, "category"), "The created post should have the new field category");
+  test.isTrue(post.category._id == category._id, "The _id of the new field should be equal to the one in the category object.");
+
+});
+
+Tinytest.add("ReactiveClass - Expanding from subobject", function(test) {
+  var CategoryCollection = new Meteor.Collection(null);
+  var Category = new ReactiveClass(CategoryCollection);
+
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection, {
+    expand: {
+      idField: 'props.categoryIds',
+      objField: 'categories',
+      collection: CategoryCollection
+    }
+  });
+
+  var category = Category.create({'name': 'General'});
+  var post = Post.create({name: "New Post", props: {categoryIds: [category._id]}});
+
+  test.isTrue(_.has(post, "categories"), "The created post should have the new field categories");
+  test.isTrue(post.categories[0]._id == category._id, "The _id of the first element in the new field should be equal to the one in the category object.");
+
+});
+
+Tinytest.add("ReactiveClass - Expanding to subobject with array", function(test) {
+  var CategoryCollection = new Meteor.Collection(null);
+  var Category = new ReactiveClass(CategoryCollection);
+
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection, {
+    expand: {
+      idField: 'categoryIds',
+      objField: 'props.categories',
+      collection: CategoryCollection
+    }
+  });
+
+  var category = Category.create({'name': 'General'});
+  var post = Post.create({name: "New Post", categoryIds: [category._id]});
+
+  test.isTrue(_.has(post, "props"), "The created post should have the new field props");
+  test.isTrue(_.has(post.props, "categories"), "The object post.props should have the field categories");
+  test.isTrue(post.props.categories[0]._id == category._id, "The _id of the first element in the new field should be equal to the one in the category object.");
+
+});
+
+Tinytest.add("ReactiveClass - Expanding to subobject", function(test) {
+  var CategoryCollection = new Meteor.Collection(null);
+  var Category = new ReactiveClass(CategoryCollection);
+
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection, {
+    expand: {
+      idField: 'categoryIds',
+      objField: 'props.category',
+      collection: CategoryCollection
+    }
+  });
+
+  var category = Category.create({'name': 'General'});
+  var post = Post.create({name: "New Post", categoryId: category._id});
+
+  test.isTrue(_.has(post, "props"), "The created post should have the new field props");
+  test.isTrue(_.has(post.props, "category"), "The object post.props should have the field categories");
+  test.isTrue(post.props.category._id == category._id, "The _id of the first element in the new field should be equal to the one in the category object.");
+
+});
+
+Tinytest.add("ReactiveClass - Don\'t save expanded object", function(test) {
+  var CategoryCollection = new Meteor.Collection(null);
+  var Category = new ReactiveClass(CategoryCollection);
+
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection, {
+    expand: {
+      idField: 'categoryId',
+      objField: 'props.category',
+      collection: CategoryCollection
+    },
+    transformCollection: false
+  });
+
+  var category = Category.create({'name': 'General'});
+  var post = Post.create({name: "New Post", categoryId: category._id});
+  post.update()
+
+  var post2 = Post.create({name: 'New Post 2', categoryId: category._id, props: {test: true}});
+  post2.update()
+
+  var newPost = PostCollection.findOne(post._id);
+  var newPost2 = PostCollection.findOne(post2._id);
+
+  test.isFalse(_.has(newPost, "props"), "The first fetched post shouldn't have the field props");
+  test.isTrue(_.has(newPost2, "props"), "The second fetched post should have the field props");
+  test.isFalse(_.has(newPost2.props, "category"), "The second fetched post shouldn't have the field props.category");
+
+});
+
+Tinytest.add("ReactiveClass - Don\'t save expanded object if initialized with array", function(test) {
+  var CategoryCollection = new Meteor.Collection(null);
+  var Category = new ReactiveClass(CategoryCollection);
+
+  var PostCollection = new Meteor.Collection(null);
+  var Post = new ReactiveClass(PostCollection, {
+    expand: [{
+      idField: 'categoryId',
+      objField: 'category',
+      collection: CategoryCollection
+    }],
+    transformCollection: false
+  });
+
+  var category = Category.create({'name': 'General'});
+  var post = Post.create({name: "New Post", categoryId: category._id});
+  post.update()
+
+  var newPost = PostCollection.findOne(post._id);
+
+  test.isFalse(_.has(newPost, "category"), "The fetched post shouldn't have the field category");
+
 });

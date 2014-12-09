@@ -4,6 +4,7 @@ ReactiveClass = function(collection, opts) {
   var defaultOpts = {
     reactive: true,
     transformCollection: true
+    //expand: []
   };
   var options = _.extend(defaultOpts, opts);
 
@@ -11,6 +12,15 @@ ReactiveClass = function(collection, opts) {
   // containing the mutable version
   var default_offline_fields = ["_dep", "_reactive", "_mongoTracker"];
   var default_do_not_update_fields = ["_id"];
+  if(options.expand) {
+    if (options.expand instanceof Array) {
+      options.expand.forEach(function(elm){
+        default_do_not_update_fields.push(elm.objField);
+      })
+    } else {
+      default_do_not_update_fields.push(options.expand.objField);
+    }
+  }
   var offline_fields = Array.prototype.slice.call(default_offline_fields);
   var do_not_update_fields = Array.prototype.slice.call(default_do_not_update_fields);
 
@@ -36,7 +46,7 @@ ReactiveClass = function(collection, opts) {
 
   if (options.transformCollection)
     ReactiveClass.setupTransform();
-    
+
 
   // decoupling the initializer from the ReactiveClass constructor
   ReactiveClass.initialize = function () {
@@ -48,6 +58,7 @@ ReactiveClass = function(collection, opts) {
   // this class. Also gives it reactivity if specified
   ReactiveClass._transformRecord = function(doc) {
     var object = new this(doc);
+    object.expand();
     return object;
   };
 
@@ -157,16 +168,57 @@ ReactiveClass = function(collection, opts) {
     return constructor;
   };
 
+  //resolve object path
+  var resolveObj = function(path, obj) {
+    return [obj].concat(path.split('.')).reduce(function(prev, curr) {
+      if(prev) {
+        if(!prev[curr]) prev[curr] = {};
+        return prev[curr];
+      }
+    });
+  }
+
+  var objectAtPath = function(obj, path, fn) {
+    var pathArray = path.split('.');
+    var lastPath = pathArray.pop();
+    var objAtPath = obj;
+    if (pathArray.length > 0) {
+      objAtPath = resolveObj(pathArray.join('.'), obj);
+    }
+
+    fn(objAtPath, lastPath);
+  }
+
+  var objOmit = function(origObj, fields) {
+    var obj = _.clone(origObj);
+    fields.forEach(function(field){
+      objectAtPath(obj, field, function(tmpObj, path){
+        delete tmpObj[path];
+      });
+      var tmp = field.split('.');
+
+      // clean object path
+      do {
+        var val = resolveObj(tmp.join('.'), obj);
+        if(_.isEmpty(val)) {
+          objectAtPath(obj, tmp.join('.'), function(tmpObj, path){
+            delete tmpObj[path];
+          });
+        }
+        tmp.pop();
+      } while(tmp.length > 0);
+    });
+    return obj;
+  }
 
   // Instance methods
-
 
   // Get sanitized version of object
   ReactiveClass.prototype.sanitize = function(keepId, isUpdate) {
     var toRemoveFields = keepId ? offline_fields : offline_fields.concat("_id");
     if (isUpdate)
       toRemoveFields = _.union(offline_fields, do_not_update_fields);
-    return _.omit(this, toRemoveFields);
+    return objOmit(this, toRemoveFields);
   };
 
 
@@ -258,12 +310,48 @@ ReactiveClass = function(collection, opts) {
     return this;
   };
 
-  // Turns on reactivity again, 
+  // Turns on reactivity again,
   ReactiveClass.prototype.unlock = function() {
     this._reactive = true;
     this.changed();
     return this;
   };
+
+  //resolve object relationships
+  ReactiveClass.prototype.expand = function() {
+    var self = this;
+    var resolve = function(elm) {
+      var idField = resolveObj(elm.idField, self);
+      if(idField instanceof Array) {
+        objectAtPath(self, elm.objField, function(obj,path) {
+          obj[path] = [];
+        });
+        idField.forEach(function(obj){
+          var item = elm.collection.findOne(obj);
+
+          if(!item) return;
+
+          objectAtPath(self, elm.objField, function(obj,path) {
+            obj[path].push(item);
+          });
+        })
+      }else{
+        var item = elm.collection.findOne(idField);
+        if(!item) return;
+        objectAtPath(self, elm.objField, function(obj,path) {
+          obj[path] = item;
+        });
+      }
+    }
+    if(options.expand instanceof Array) {
+      options.expand.forEach(function(elm){
+        resolve(elm);
+      });
+    } else if(typeof(options.expand)=="object") {
+      resolve(options.expand);
+    }
+    return this;
+  }
 
   // Force a one-off database refresh
   ReactiveClass.prototype.refresh = function() {
@@ -272,11 +360,14 @@ ReactiveClass = function(collection, opts) {
         "Cannot refresh as this object has no _id. " +
         "Perhaps it was never inserted before."
       );
-    var newFields = collection.findOne(this._id);
+    var newFields = collection.findOne(this._id, {transform: null});
     if (!newFields) {
       return;
     }
     _.extend(this, newFields);
+
+    this.expand();
+
     this.changed();
     return this;
   };
@@ -340,4 +431,3 @@ ReactiveClass = function(collection, opts) {
   return ReactiveClass;
 
 };
-
